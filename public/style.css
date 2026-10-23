@@ -175,13 +175,74 @@ body {
     background: rgba(255, 50, 50, 0.9);
 }
 
+#btnTask {
+    background: rgba(50, 200, 50, 0.5);
+    border: 3px solid rgba(0, 255, 0, 0.9);
+    box-shadow: 0 0 15px lime;
+    margin-left: 20px;
+}
+#btnTask:active {
+    background: rgba(50, 200, 50, 0.9);
+}
+
+.modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.modal-content {
+    background: #333;
+    padding: 30px;
+    border-radius: 15px;
+    border: 4px solid #fff;
+    text-align: center;
+    max-width: 500px;
+    width: 90%;
+}
+
+.task-answers button {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    padding: 15px;
+    font-size: 1.2em;
+    background: #444;
+    color: white;
+    border: 2px solid #666;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Fredoka One', cursive;
+}
+
+.task-answers button:hover {
+    background: #555;
+}
+
+#btnCloseTask {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: #c51111;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: 'Fredoka One', cursive;
+}
+
 .desktop-only {
     display: block;
 }
 
+/* We will show mobile controls on desktop too if the user wants it, or at least not hide it completely, but let's hide it by default unless it's a touch device or small screen. For now, keep it visible always for testing, or just use media queries. Let's make it always visible if requested, but transparent on desktop. Actually, let's keep the media query but add a way to force show it. */
 @media (min-width: 900px) {
     #mobileControls {
-        display: none;
+        /* display: none; */
+        opacity: 0.5; /* Show faintly on desktop */
     }
 }
 @media (max-width: 899px) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Space Imposters</title>
+  <title>Bible Us for Juan</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
   <!-- LOBBY SCREEN -->
   <div id="lobbyScreen" class="screen active">
       <div class="lobby-box">
-          <h1>SPACE IMPOSTERS</h1>
+          <h1>BIBLE US FOR JUAN</h1>
           <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="10">
           <button id="btnJoinGame">JOIN GAME</button>
       </div>
@@ -22,7 +22,31 @@
       <div id="ui">
           <h1 id="roleDisplay">Loading Role...</h1>
           <p id="statusDisplay">Alive</p>
-          <p id="controls" class="desktop-only">WASD/Arrows to Move. Imposters: Space to Kill.</p>
+          <div id="taskProgressContainer" style="display:none; margin-top: 10px; width: 200px; height: 15px; border: 2px solid white; border-radius: 10px; overflow: hidden; background: #333;">
+              <div id="taskProgressBar" style="width: 0%; height: 100%; background: #00ff00;"></div>
+          </div>
+          <p id="controls" class="desktop-only">WASD to Move. Judas: Space to Kill. Faithful: E to do Tasks. R to Report.</p>
+      </div>
+
+      <!-- MEETING MODAL -->
+      <div id="meetingModal" class="modal" style="display:none;">
+          <div class="modal-content">
+              <h2>EMERGENCY MEETING</h2>
+              <p id="meetingStatus">Discuss and Vote!</p>
+              <div id="voiceChatStatus" style="color: #ffaa00; margin-bottom: 10px; font-weight: bold;">Connecting Voice Chat...</div>
+              <div id="votingArea" class="task-answers"></div>
+              <p id="voteTimer">Time left: 30</p>
+          </div>
+      </div>
+
+      <!-- TASK MODAL -->
+      <div id="taskModal" class="modal" style="display:none;">
+          <div class="modal-content">
+              <h2>Biblical Task</h2>
+              <p id="taskQuestion">Loading question...</p>
+              <div id="taskAnswers" class="task-answers"></div>
+              <button id="btnCloseTask">Close</button>
+          </div>
       </div>
 
       <canvas id="gameCanvas"></canvas>
@@ -37,12 +61,15 @@
               </div>
           </div>
           <div class="action-area">
-              <button id="btnKill" class="action-btn">KILL</button>
+              <button id="btnKill" class="action-btn" style="display:none;">KILL</button>
+              <button id="btnTask" class="action-btn" style="display:none;">TASK</button>
+              <button id="btnReport" class="action-btn" style="display:none; background:rgba(255,165,0,0.5); border-color:orange; box-shadow: 0 0 15px orange;">REPORT</button>
           </div>
       </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/game.js"></script>
+  <script src="/voice.js"></script>
 </body>
 </html>
