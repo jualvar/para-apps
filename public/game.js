@@ -50,7 +50,15 @@ const btnLeft = document.getElementById('btnLeft');
 const btnRight = document.getElementById('btnRight');
 const btnKill = document.getElementById('btnKill');
 const btnTask = document.getElementById('btnTask');
+const btnReport = document.getElementById('btnReport');
 const taskProgressContainer = document.getElementById('taskProgressContainer');
+const meetingModal = document.getElementById('meetingModal');
+const meetingStatus = document.getElementById('meetingStatus');
+const votingArea = document.getElementById('votingArea');
+const voteTimer = document.getElementById('voteTimer');
+
+let isMeeting = false;
+let myVote = null;
 const taskProgressBar = document.getElementById('taskProgressBar');
 const taskModal = document.getElementById('taskModal');
 const taskQuestion = document.getElementById('taskQuestion');
@@ -65,7 +73,7 @@ function setupTouch(btn, key) {
     btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
     btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
 }
-setupTouch(btnUp, 'w'); setupTouch(btnDown, 's'); setupTouch(btnLeft, 'a'); setupTouch(btnRight, 'd'); setupTouch(btnKill, ' '); setupTouch(btnTask, 'e');
+setupTouch(btnUp, 'w'); setupTouch(btnDown, 's'); setupTouch(btnLeft, 'a'); setupTouch(btnRight, 'd'); setupTouch(btnKill, ' '); setupTouch(btnTask, 'e'); setupTouch(btnReport, 'r');
 
 btnCloseTask.addEventListener('click', () => {
     taskModal.style.display = 'none';
@@ -93,6 +101,78 @@ socket.on('initGame', (data) => {
     requestAnimationFrame(gameLoop); // Start loop only after init
 });
 
+
+socket.on('meetingStarted', (data) => {
+    isMeeting = true;
+    myVote = null;
+    startVoiceChat(); // Start voice chat when meeting starts
+    players = data.players; // Updates positions to center
+    meetingModal.style.display = 'flex';
+    meetingStatus.innerText = 'Discuss and Vote!';
+    voteTimer.innerText = 'Time left: ' + data.time;
+    btnKill.style.display = 'none';
+    btnTask.style.display = 'none';
+    btnReport.style.display = 'none';
+    keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+
+    votingArea.innerHTML = '';
+
+    // Skip button
+    const skipBtn = document.createElement('button');
+    skipBtn.innerText = 'Skip Vote';
+    skipBtn.style.background = '#666';
+    skipBtn.onclick = () => castVote('skip');
+    votingArea.appendChild(skipBtn);
+
+    for (let id in players) {
+        const p = players[id];
+        if (p.isAlive) {
+            const btn = document.createElement('button');
+            btn.id = 'voteBtn_' + id;
+            btn.innerText = p.name;
+            btn.style.color = p.color;
+            btn.onclick = () => castVote(id);
+            votingArea.appendChild(btn);
+        }
+    }
+});
+
+function castVote(targetId) {
+    if (myVote) return;
+    myVote = targetId;
+    socket.emit('castVote', targetId);
+    meetingStatus.innerText = 'Waiting for others...';
+}
+
+socket.on('meetingTimer', (time) => {
+    voteTimer.innerText = 'Time left: ' + time;
+});
+
+socket.on('voteUpdate', (votes) => {
+    // Optionally show who voted, for now just simple
+});
+
+socket.on('meetingEnded', (data) => {
+    isMeeting = false;
+    stopVoiceChat(); // Stop voice chat when meeting ends
+    meetingModal.style.display = 'none';
+    players = data.players;
+    deadBodies = [];
+    updateUI();
+
+    if (data.tie) {
+        alert("Tie! No one was ejected.");
+    } else if (data.ejectedId) {
+        const ejected = players[data.ejectedId];
+        if (ejected) {
+            const role = ejected.isImposter ? 'Judas' : 'Faithful';
+            alert(ejected.name + " was ejected. They were " + role + ".");
+        }
+    } else {
+        alert("Votes skipped. No one was ejected.");
+    }
+});
+
 socket.on('updateTaskProgress', (progress) => {
     taskProgress = progress;
     updateUI();
@@ -105,6 +185,7 @@ socket.on('playerMoved', (playerInfo) => {
         players[playerInfo.id].x = playerInfo.x;
         players[playerInfo.id].y = playerInfo.y;
         players[playerInfo.id].facingRight = playerInfo.facingRight;
+        players[playerInfo.id].isMoving = playerInfo.isMoving;
     }
 });
 
@@ -122,18 +203,34 @@ function updateUI() {
     const me = players[myId];
 
     if (me.isImposter) {
-        roleDisplay.innerText = 'Role: Traitor';
+        roleDisplay.innerText = 'Role: Judas (Traitor)';
         roleDisplay.className = 'imposter';
-        btnKill.style.display = 'block';
+        if(!isMeeting) btnKill.style.display = 'block';
         if(btnTask) btnTask.style.display = 'none';
         if(taskProgressContainer) taskProgressContainer.style.display = 'none';
     } else {
         roleDisplay.innerText = 'Role: Faithful';
         roleDisplay.className = 'crewmate';
         btnKill.style.display = 'none';
-        if(btnTask) btnTask.style.display = 'block';
+        if(!isMeeting && btnTask) btnTask.style.display = 'block';
         if(taskProgressContainer) taskProgressContainer.style.display = 'block';
         if(taskProgressBar) taskProgressBar.style.width = taskProgress + '%';
+    }
+
+    // Check if near body to show report button
+    let nearBody = false;
+    if (me.isAlive && !isMeeting) {
+        for (let body of deadBodies) {
+            if (Math.hypot(me.x - body.x, me.y - body.y) < 150) {
+                nearBody = true;
+                break;
+            }
+        }
+    }
+    if (nearBody) {
+        btnReport.style.display = 'block';
+    } else {
+        btnReport.style.display = 'none';
     }
 
     if (!me.isAlive) {
@@ -143,6 +240,35 @@ function updateUI() {
         statusDisplay.innerText = 'STATUS: ALIVE';
         statusDisplay.className = '';
     }
+}
+
+
+// Map definitions
+const walls = [
+    { x: 400, y: 400, w: 200, h: 50 },
+    { x: 400, y: 400, w: 50, h: 400 },
+    { x: 800, y: 800, w: 600, h: 50 },
+    { x: 1400, y: 400, w: 50, h: 450 },
+    { x: 2000, y: 200, w: 50, h: 600 },
+    { x: 400, y: 1200, w: 800, h: 50 },
+    { x: 1600, y: 1200, w: 800, h: 50 },
+    { x: 400, y: 1800, w: 50, h: 800 },
+    { x: 1400, y: 1800, w: 50, h: 800 },
+    { x: 2000, y: 1800, w: 50, h: 800 },
+    { x: 800, y: 2200, w: 600, h: 50 },
+    // A central table
+    { x: 1350, y: 1350, w: 300, h: 300 }
+];
+
+function checkCollision(x, y, radius) {
+    for (let w of walls) {
+        // Simple AABB vs Circle collision check
+        const testX = Math.max(w.x, Math.min(x, w.x + w.w));
+        const testY = Math.max(w.y, Math.min(y, w.y + w.h));
+        const dist = Math.hypot(x - testX, y - testY);
+        if (dist < radius) return true;
+    }
+    return false;
 }
 
 // --- Drawing Logic ---
@@ -170,6 +296,26 @@ function drawMap() {
     ctx.strokeStyle = '#a0aec0';
     ctx.lineWidth = 20;
     ctx.strokeRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
+
+    // Draw internal walls
+    ctx.fillStyle = '#2d3748';
+    walls.forEach(w => {
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+    });
+
+    // Emergency Button on table
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.arc(1500, 1500, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#880000';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText("EMERGENCY", 1500, 1505);
 
     // Draw Tasks
     if (players[myId] && !players[myId].isImposter && tasks) {
@@ -257,12 +403,18 @@ function drawPlayer(player) {
     ctx.beginPath();
     ctx.arc(0, 0, 22, Math.PI, 0); // Head
     ctx.lineTo(22, 20); // Right side
+    let isMoving = player.isMoving || false;
+    let walkOffset = 0;
+    if (isMoving && player.isAlive) {
+        walkOffset = Math.sin(Date.now() / 100) * 5;
+    }
+
     // Right Leg
-    ctx.arc(12, 20, 10, 0, Math.PI);
+    ctx.arc(12, 20 + walkOffset, 10, 0, Math.PI);
     // Crotch
     ctx.lineTo(-2, 20);
     // Left Leg
-    ctx.arc(-12, 20, 10, 0, Math.PI);
+    ctx.arc(-12, 20 - walkOffset, 10, 0, Math.PI);
     ctx.lineTo(-22, 0); // Left side
     ctx.closePath();
     ctx.fill();
@@ -307,16 +459,28 @@ function update() {
         if (keys.a || keys.ArrowLeft) { dx -= speed; players[myId].facingRight = false; }
         if (keys.d || keys.ArrowRight) { dx += speed; players[myId].facingRight = true; }
 
-        if (dx !== 0 || dy !== 0) {
-            players[myId].x += dx;
-            players[myId].y += dy;
+        if ((dx !== 0 || dy !== 0) && !isMeeting) {
+            players[myId].isMoving = true;
+            let nextX = players[myId].x + dx;
+            let nextY = players[myId].y + dy;
 
             // Collisions with walls
             // Allow ghosts to walk through walls, alive players cannot
             if (players[myId].isAlive) {
-                players[myId].x = Math.max(220, Math.min(MAP_WIDTH - 220, players[myId].x));
-                players[myId].y = Math.max(220, Math.min(MAP_HEIGHT - 230, players[myId].y));
+                // Check outer bounds
+                nextX = Math.max(220, Math.min(MAP_WIDTH - 220, nextX));
+                nextY = Math.max(220, Math.min(MAP_HEIGHT - 230, nextY));
+
+                // Check internal walls
+                if (!checkCollision(nextX, players[myId].y, 25)) {
+                    players[myId].x = nextX;
+                }
+                if (!checkCollision(players[myId].x, nextY, 25)) {
+                    players[myId].y = nextY;
+                }
             } else {
+                players[myId].x = nextX;
+                players[myId].y = nextY;
                 players[myId].x = Math.max(20, Math.min(MAP_WIDTH - 20, players[myId].x));
                 players[myId].y = Math.max(20, Math.min(MAP_HEIGHT - 20, players[myId].y));
             }
@@ -325,7 +489,10 @@ function update() {
         }
 
         if (moved) {
-            socket.emit('playerMovement', { x: players[myId].x, y: players[myId].y, facingRight: players[myId].facingRight });
+            socket.emit('playerMovement', { x: players[myId].x, y: players[myId].y, facingRight: players[myId].facingRight, isMoving: true });
+        } else if (players[myId].isMoving) {
+            players[myId].isMoving = false;
+            socket.emit('playerMovement', { x: players[myId].x, y: players[myId].y, facingRight: players[myId].facingRight, isMoving: false });
         }
 
         // Camera Follow Logic
@@ -357,8 +524,22 @@ function update() {
             }
         }
 
+        if ((keys['r'] || keys['R']) && players[myId].isAlive && !isMeeting) {
+            keys['r'] = false; keys['R'] = false;
+            socket.emit('reportBody');
+        }
+
+        // Emergency Button Logic
+        if ((keys['e'] || keys['E']) && players[myId].isAlive && !isMeeting) {
+            const distToButton = Math.hypot(players[myId].x - 1500, players[myId].y - 1500);
+            if (distToButton < 150) {
+                keys['e'] = false; keys['E'] = false;
+                socket.emit('callEmergency');
+            }
+        }
+
         // Task Logic
-        if ((keys['e'] || keys['E']) && !players[myId].isImposter && players[myId].isAlive && taskModal.style.display === 'none') {
+        if ((keys['e'] || keys['E']) && !players[myId].isImposter && players[myId].isAlive && taskModal.style.display === 'none' && !isMeeting) {
             keys['e'] = false; keys['E'] = false;
             let closestTask = null;
             let closestTaskIndex = -1;
