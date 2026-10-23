@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Among Us - Edición Bíblica</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script> <!-- Joystick library -->
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-layer">
+            <div id="joystick-zone"></div>
+            <button id="action-button">Acción</button>
+            <div id="role-display">Role: Esperando...</div>
+        </div>
+        <div id="start-screen">
+            <h1>Entre Nosotros - Jerusalén</h1>
+            <input type="text" id="username-input" placeholder="Tu Nombre" />
+            <button id="start-button">Unirse</button>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
