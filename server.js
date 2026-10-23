@@ -77,8 +77,8 @@ function startMeeting(callerId) {
     // Move everyone to center
     for (let id in players) {
         if (players[id].isAlive) {
-            players[id].x = MAP_WIDTH / 2 + (Math.random() * 100 - 50);
-            players[id].y = MAP_HEIGHT / 2 + (Math.random() * 100 - 50);
+            players[id].x = 1500 + Math.cos(Math.random()*Math.PI*2) * 250;
+            players[id].y = 1500 + Math.sin(Math.random()*Math.PI*2) * 250;
         }
     }
 
@@ -147,8 +147,8 @@ io.on('connection', (socket) => {
       players[socket.id] = {
         id: socket.id,
         name: playerName || `Player${Math.floor(Math.random()*1000)}`,
-        x: MAP_WIDTH / 2 + (Math.random() * 200 - 100),
-        y: MAP_HEIGHT / 2 + (Math.random() * 200 - 100),
+        x: 600 + (Math.random() * 200 - 100),
+        y: 600 + (Math.random() * 200 - 100),
         color: assignedColor,
         isImposter: isImposter,
         isAlive: true,

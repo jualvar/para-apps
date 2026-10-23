@@ -123,115 +123,13 @@ body {
     pointer-events: none;
 }
 
-#dpad {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+#joystickZone {
+    position: absolute;
+    bottom: 30px;
+    left: 30px;
+    width: 150px;
+    height: 150px;
     pointer-events: auto;
-}
-
-.dpad-middle {
-    display: flex;
-}
-
-.dpad-btn {
-    width: 65px;
-    height: 65px;
-    margin: 5px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    border-radius: 15px;
-    color: white;
-    font-size: 24px;
-    user-select: none;
-    touch-action: manipulation;
-}
-
-.dpad-btn:active {
-    background: rgba(255, 255, 255, 0.4);
-}
-
-.action-area {
-    display: flex;
-    align-items: flex-end;
-    pointer-events: auto;
-}
-
-.action-btn {
-    width: 90px;
-    height: 90px;
-    background: rgba(255, 50, 50, 0.5);
-    border: 3px solid rgba(255, 0, 0, 0.9);
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-    font-size: 22px;
-    font-family: 'Fredoka One';
-    user-select: none;
-    touch-action: manipulation;
-    box-shadow: 0 0 15px red;
-}
-.action-btn:active {
-    background: rgba(255, 50, 50, 0.9);
-}
-
-#btnTask {
-    background: rgba(50, 200, 50, 0.5);
-    border: 3px solid rgba(0, 255, 0, 0.9);
-    box-shadow: 0 0 15px lime;
-    margin-left: 20px;
-}
-#btnTask:active {
-    background: rgba(50, 200, 50, 0.9);
-}
-
-.modal {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-}
-
-.modal-content {
-    background: #333;
-    padding: 30px;
-    border-radius: 15px;
-    border: 4px solid #fff;
-    text-align: center;
-    max-width: 500px;
-    width: 90%;
-}
-
-.task-answers button {
-    display: block;
-    width: 100%;
-    margin: 10px 0;
-    padding: 15px;
-    font-size: 1.2em;
-    background: #444;
-    color: white;
-    border: 2px solid #666;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family: 'Fredoka One', cursive;
-}
-
-.task-answers button:hover {
-    background: #555;
-}
-
-#btnCloseTask {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background: #c51111;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-family: 'Fredoka One', cursive;
 }
 
 .desktop-only {
@@ -249,4 +147,53 @@ body {
     .desktop-only {
         display: none;
     }
+}
+
+/* Virtual Joystick and Action Buttons */
+#mobileControls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+#joystickZone {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 150px;
+    height: 150px;
+    pointer-events: auto;
+}
+
+.action-area {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.action-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 2px solid white;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: 'Fredoka One', cursive, sans-serif;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.action-btn:active {
+    transform: scale(0.9);
 }

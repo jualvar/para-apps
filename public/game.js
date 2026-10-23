@@ -27,12 +27,33 @@ const camera = { x: 0, y: 0 };
 const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, ' ': false, 'e': false, 'E': false };
 
 // --- UI Logic ---
+
+function requestFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+        el.requestFullscreen();
+    } else if (el.mozRequestFullScreen) { /* Firefox */
+        el.mozRequestFullScreen();
+    } else if (el.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+        el.webkitRequestFullscreen();
+    } else if (el.msRequestFullscreen) { /* IE/Edge */
+        el.msRequestFullscreen();
+    }
+
+    // Lock orientation if supported
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(e => console.log('Orientation lock not supported', e));
+    }
+}
+
 btnJoinGame.addEventListener('click', () => {
+    requestFullscreen();
     const name = playerNameInput.value.trim();
     if (name.length > 0) {
         socket.connect();
         socket.emit('joinGame', name);
         lobbyScreen.classList.remove('active');
+        initJoystick();
         gameScreen.classList.add('active');
         resizeCanvas();
     } else {
@@ -44,13 +65,8 @@ btnJoinGame.addEventListener('click', () => {
 document.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
 document.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
-const btnUp = document.getElementById('btnUp');
-const btnDown = document.getElementById('btnDown');
-const btnLeft = document.getElementById('btnLeft');
-const btnRight = document.getElementById('btnRight');
-const btnKill = document.getElementById('btnKill');
-const btnTask = document.getElementById('btnTask');
-const btnReport = document.getElementById('btnReport');
+
+const btnAction = document.getElementById('btnAction');
 const taskProgressContainer = document.getElementById('taskProgressContainer');
 const meetingModal = document.getElementById('meetingModal');
 const meetingStatus = document.getElementById('meetingStatus');
@@ -73,7 +89,33 @@ function setupTouch(btn, key) {
     btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
     btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
 }
-setupTouch(btnUp, 'w'); setupTouch(btnDown, 's'); setupTouch(btnLeft, 'a'); setupTouch(btnRight, 'd'); setupTouch(btnKill, ' '); setupTouch(btnTask, 'e'); setupTouch(btnReport, 'r');
+
+// Nipple.js Joystick
+let joystickManager = null;
+let joystickMove = { x: 0, y: 0 };
+
+function initJoystick() {
+    if (joystickManager) return;
+    joystickManager = nipplejs.create({
+        zone: document.getElementById('joystickZone'),
+        mode: 'static',
+        position: { left: '50%', top: '50%' },
+        color: 'white'
+    });
+
+    joystickManager.on('move', (evt, data) => {
+        if (data && data.vector) {
+            joystickMove.x = data.vector.x;
+            joystickMove.y = -data.vector.y; // nipplejs y is inverted
+        }
+    });
+
+    joystickManager.on('end', () => {
+        joystickMove.x = 0;
+        joystickMove.y = 0;
+    });
+}
+ setupTouch(btnAction, ' ');
 
 btnCloseTask.addEventListener('click', () => {
     taskModal.style.display = 'none';
@@ -110,9 +152,7 @@ socket.on('meetingStarted', (data) => {
     meetingModal.style.display = 'flex';
     meetingStatus.innerText = 'Discuss and Vote!';
     voteTimer.innerText = 'Time left: ' + data.time;
-    btnKill.style.display = 'none';
-    btnTask.style.display = 'none';
-    btnReport.style.display = 'none';
+    btnAction.style.display = 'none';
     keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
 
     votingArea.innerHTML = '';
@@ -205,32 +245,12 @@ function updateUI() {
     if (me.isImposter) {
         roleDisplay.innerText = 'Role: Judas (Traitor)';
         roleDisplay.className = 'imposter';
-        if(!isMeeting) btnKill.style.display = 'block';
-        if(btnTask) btnTask.style.display = 'none';
         if(taskProgressContainer) taskProgressContainer.style.display = 'none';
     } else {
         roleDisplay.innerText = 'Role: Faithful';
         roleDisplay.className = 'crewmate';
-        btnKill.style.display = 'none';
-        if(!isMeeting && btnTask) btnTask.style.display = 'block';
         if(taskProgressContainer) taskProgressContainer.style.display = 'block';
         if(taskProgressBar) taskProgressBar.style.width = taskProgress + '%';
-    }
-
-    // Check if near body to show report button
-    let nearBody = false;
-    if (me.isAlive && !isMeeting) {
-        for (let body of deadBodies) {
-            if (Math.hypot(me.x - body.x, me.y - body.y) < 150) {
-                nearBody = true;
-                break;
-            }
-        }
-    }
-    if (nearBody) {
-        btnReport.style.display = 'block';
-    } else {
-        btnReport.style.display = 'none';
     }
 
     if (!me.isAlive) {
@@ -274,40 +294,59 @@ function checkCollision(x, y, radius) {
 // --- Drawing Logic ---
 
 function drawMap() {
+
     // Fill deep space
     ctx.fillStyle = '#050510';
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
     // Draw Spaceship Floor (centered)
-    ctx.fillStyle = '#4a5568';
+    ctx.fillStyle = '#3a4454';
     ctx.fillRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
 
-    // Draw some floor tiles
-    ctx.strokeStyle = '#2d3748';
+    // Draw stone/tile floor pattern
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.lineWidth = 2;
-    for (let x = 200; x < MAP_WIDTH - 200; x += 100) {
+    const tileSize = 60;
+    for (let x = 200; x < MAP_WIDTH - 200; x += tileSize) {
         ctx.beginPath(); ctx.moveTo(x, 200); ctx.lineTo(x, MAP_HEIGHT-200); ctx.stroke();
     }
-    for (let y = 200; y < MAP_HEIGHT - 200; y += 100) {
+    for (let y = 200; y < MAP_HEIGHT - 200; y += tileSize) {
         ctx.beginPath(); ctx.moveTo(200, y); ctx.lineTo(MAP_WIDTH-200, y); ctx.stroke();
     }
 
     // Draw thick outer walls
-    ctx.strokeStyle = '#a0aec0';
-    ctx.lineWidth = 20;
+    ctx.fillStyle = '#718096';
+    ctx.fillRect(200, 150, MAP_WIDTH - 400, 50); // Top
+    ctx.fillRect(200, MAP_HEIGHT - 200, MAP_WIDTH - 400, 50); // Bottom
+    ctx.fillRect(150, 150, 50, MAP_HEIGHT - 300); // Left
+    ctx.fillRect(MAP_WIDTH - 200, 150, 50, MAP_HEIGHT - 300); // Right
+
+    ctx.strokeStyle = '#2d3748';
+    ctx.lineWidth = 4;
     ctx.strokeRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
 
-    // Draw internal walls
-    ctx.fillStyle = '#2d3748';
+    // Draw internal walls with 3D depth effect
     walls.forEach(w => {
-        ctx.fillRect(w.x, w.y, w.w, w.h);
-        ctx.strokeRect(w.x, w.y, w.w, w.h);
+        // Wall Top (lighter)
+        ctx.fillStyle = '#a0aec0';
+        ctx.fillRect(w.x, w.y - 40, w.w, w.h);
+        ctx.strokeRect(w.x, w.y - 40, w.w, w.h);
+
+        // Wall Face (darker)
+        ctx.fillStyle = '#4a5568';
+        ctx.fillRect(w.x, w.y - 40 + w.h, w.w, 40);
+        ctx.strokeRect(w.x, w.y - 40 + w.h, w.w, 40);
     });
 
     // Emergency Button on table
+    ctx.fillStyle = '#a0aec0';
+    ctx.beginPath(); ctx.arc(1500, 1490, 80, 0, Math.PI*2); ctx.fill(); ctx.stroke(); // Table top
+    ctx.fillStyle = '#4a5568';
+    ctx.beginPath(); ctx.ellipse(1500, 1500, 80, 40, 0, 0, Math.PI); ctx.fill(); ctx.stroke(); // Table side
+
     ctx.fillStyle = '#ff0000';
     ctx.beginPath();
-    ctx.arc(1500, 1500, 40, 0, Math.PI * 2);
+    ctx.arc(1500, 1490, 40, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#880000';
     ctx.lineWidth = 5;
@@ -315,7 +354,8 @@ function drawMap() {
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px Arial';
-    ctx.fillText("EMERGENCY", 1500, 1505);
+    ctx.fillText("EMERGENCY", 1500, 1495);
+
 
     // Draw Tasks
     if (players[myId] && !players[myId].isImposter && tasks) {
@@ -456,8 +496,18 @@ function update() {
 
         if (keys.w || keys.ArrowUp) dy -= speed;
         if (keys.s || keys.ArrowDown) dy += speed;
-        if (keys.a || keys.ArrowLeft) { dx -= speed; players[myId].facingRight = false; }
-        if (keys.d || keys.ArrowRight) { dx += speed; players[myId].facingRight = true; }
+        if (keys.a || keys.ArrowLeft) dx -= speed;
+        if (keys.d || keys.ArrowRight) dx += speed;
+
+        // Add joystick vector
+        if (joystickMove.x !== 0 || joystickMove.y !== 0) {
+            dx += joystickMove.x * speed;
+            dy += joystickMove.y * speed;
+        }
+
+        if (dx < 0) players[myId].facingRight = false;
+        if (dx > 0) players[myId].facingRight = true;
+
 
         if ((dx !== 0 || dy !== 0) && !isMeeting) {
             players[myId].isMoving = true;
@@ -503,65 +553,112 @@ function update() {
         camera.x = Math.max(0, Math.min(MAP_WIDTH - canvas.width, camera.x));
         camera.y = Math.max(0, Math.min(MAP_HEIGHT - canvas.height, camera.y));
 
-        // Kill logic
-        if (keys[' '] && players[myId].isImposter && players[myId].isAlive) {
-            let closestId = null;
-            let minDistance = 120; // Kill range
 
-            for (const id in players) {
-                if (id !== myId && players[id].isAlive && !players[id].isImposter) {
-                    const dist = Math.hypot(players[myId].x - players[id].x, players[myId].y - players[id].y);
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        closestId = id;
+        // --- Dynamic Action Button Logic ---
+        let canKill = false;
+        let canReport = false;
+        let canEmergency = false;
+        let canTask = false;
+
+        let killTarget = null;
+        let taskTarget = null;
+
+        if (players[myId].isAlive && !isMeeting) {
+            btnAction.style.display = 'block';
+            btnAction.style.opacity = '0.5';
+            btnAction.innerText = 'USE';
+            btnAction.style.borderColor = 'white';
+            btnAction.style.boxShadow = 'none';
+            btnAction.style.background = 'rgba(255,255,255,0.3)';
+
+            // 1. Check Report
+            for (let body of deadBodies) {
+                if (Math.hypot(players[myId].x - body.x, players[myId].y - body.y) < 150) {
+                    canReport = true;
+                    break;
+                }
+            }
+
+            // 2. Check Emergency
+            if (Math.hypot(players[myId].x - 1500, players[myId].y - 1500) < 150) {
+                canEmergency = true;
+            }
+
+            // 3. Check Task (if Faithful)
+            if (!players[myId].isImposter) {
+                let minDistance = 100;
+                if (tasks) {
+                    tasks.forEach((task, index) => {
+                        if (!completedTasks.has(index)) {
+                            const dist = Math.hypot(players[myId].x - task.x, players[myId].y - task.y);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                taskTarget = task;
+                                taskTarget.index = index;
+                                canTask = true;
+                            }
+                        }
+                    });
+                }
+            }
+
+            // 4. Check Kill (if Judas)
+            if (players[myId].isImposter) {
+                let minDistance = 120;
+                for (const id in players) {
+                    if (id !== myId && players[id].isAlive && !players[id].isImposter) {
+                        const dist = Math.hypot(players[myId].x - players[id].x, players[myId].y - players[id].y);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            killTarget = id;
+                            canKill = true;
+                        }
                     }
                 }
             }
 
-            if (closestId) {
-                socket.emit('kill', closestId);
-                keys[' '] = false; // Prevent rapid firing
+            // Prioritize button visual
+            if (canReport) {
+                btnAction.style.opacity = '1';
+                btnAction.innerText = 'REPORT';
+                btnAction.style.borderColor = 'orange';
+                btnAction.style.boxShadow = '0 0 15px orange';
+                btnAction.style.background = 'rgba(255,165,0,0.5)';
+            } else if (canKill) {
+                btnAction.style.opacity = '1';
+                btnAction.innerText = 'KILL';
+                btnAction.style.borderColor = 'red';
+                btnAction.style.boxShadow = '0 0 15px red';
+                btnAction.style.background = 'rgba(255,0,0,0.5)';
+            } else if (canEmergency) {
+                btnAction.style.opacity = '1';
+                btnAction.innerText = 'MEETING';
+                btnAction.style.borderColor = 'red';
+                btnAction.style.boxShadow = '0 0 15px red';
+                btnAction.style.background = 'rgba(255,0,0,0.5)';
+            } else if (canTask) {
+                btnAction.style.opacity = '1';
+                btnAction.innerText = 'TASK';
+                btnAction.style.borderColor = 'lime';
+                btnAction.style.boxShadow = '0 0 15px lime';
+                btnAction.style.background = 'rgba(0,255,0,0.5)';
+            }
+
+            // Handle Press
+            if (keys[' '] || keys['e'] || keys['E'] || keys['r'] || keys['R']) {
+                if (canReport) {
+                    socket.emit('reportBody');
+                } else if (canKill) {
+                    socket.emit('kill', killTarget);
+                } else if (canEmergency) {
+                    socket.emit('callEmergency');
+                } else if (canTask && taskModal.style.display === 'none') {
+                    openTaskModal(taskTarget, taskTarget.index);
+                }
+                keys[' '] = keys['e'] = keys['E'] = keys['r'] = keys['R'] = false;
             }
         }
 
-        if ((keys['r'] || keys['R']) && players[myId].isAlive && !isMeeting) {
-            keys['r'] = false; keys['R'] = false;
-            socket.emit('reportBody');
-        }
-
-        // Emergency Button Logic
-        if ((keys['e'] || keys['E']) && players[myId].isAlive && !isMeeting) {
-            const distToButton = Math.hypot(players[myId].x - 1500, players[myId].y - 1500);
-            if (distToButton < 150) {
-                keys['e'] = false; keys['E'] = false;
-                socket.emit('callEmergency');
-            }
-        }
-
-        // Task Logic
-        if ((keys['e'] || keys['E']) && !players[myId].isImposter && players[myId].isAlive && taskModal.style.display === 'none' && !isMeeting) {
-            keys['e'] = false; keys['E'] = false;
-            let closestTask = null;
-            let closestTaskIndex = -1;
-            let minDistance = 100;
-
-            if (tasks) {
-                tasks.forEach((task, index) => {
-                    if (!completedTasks.has(index)) {
-                        const dist = Math.hypot(players[myId].x - task.x, players[myId].y - task.y);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            closestTask = task;
-                            closestTaskIndex = index;
-                        }
-                    }
-                });
-            }
-
-            if (closestTask) {
-                openTaskModal(closestTask, closestTaskIndex);
-            }
-        }
     }
 }
 
