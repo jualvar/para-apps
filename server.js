@@ -1,119 +1,105 @@
 const express = require('express');
 const app = express();
-const http = require('http').Server(app);
-const io = require('socket.io')(http);
-const port = process.env.PORT || 3000;
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(server);
 
 app.use(express.static('public'));
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/index.html');
-});
+const players = {};
+let deadBodies = [];
+const colors = ['#c51111', '#132ed1', '#117f2d', '#ed54ba', '#ef7d0d', '#f5f557', '#3f474e', '#d6e0f0', '#6b2fbb', '#38fedc'];
+let colorIndex = 0;
 
-let players = {};
-let judasId = null;
-
-const colors = ['#ff9999', '#99ccff', '#99ff99', '#ffff99', '#cc99ff', '#ffcc99'];
+// Map bounds (much larger now)
+const MAP_WIDTH = 3000;
+const MAP_HEIGHT = 3000;
 
 io.on('connection', (socket) => {
-  console.log('a user connected: ' + socket.id);
+  console.log('a user connected', socket.id);
 
-  socket.on('joinGame', (username) => {
-    players[socket.id] = {
-      x: 1000 + Math.random() * 200 - 100, // Center roughly
-      y: 1000 + Math.random() * 200 - 100,
-      radius: 20,
-      color: colors[Object.keys(players).length % colors.length],
-      name: username,
-      isAlive: true,
-      role: 'disciple'
-    };
+  socket.on('joinGame', (playerName) => {
+      // Assign a color
+      const assignedColor = colors[colorIndex % colors.length];
+      colorIndex++;
 
-    // Assign roles if enough players, or just make the first one Judas for testing
-    if (!judasId || !players[judasId]) {
-        judasId = socket.id;
-        players[socket.id].role = 'judas';
-    }
+      // Assign role (20% chance imposter)
+      const isImposter = Math.random() < 0.2;
 
-    socket.emit('init', { id: socket.id, players: players });
-    socket.emit('roleAssigned', players[socket.id].role);
-    io.emit('updatePlayers', players);
+      // Spawn in center area roughly
+      players[socket.id] = {
+        id: socket.id,
+        name: playerName || `Player${Math.floor(Math.random()*1000)}`,
+        x: MAP_WIDTH / 2 + (Math.random() * 200 - 100),
+        y: MAP_HEIGHT / 2 + (Math.random() * 200 - 100),
+        color: assignedColor,
+        isImposter: isImposter,
+        isAlive: true,
+        facingRight: true
+      };
+
+      // Send initial data to the new player
+      socket.emit('initGame', {
+          players: players,
+          deadBodies: deadBodies,
+          mapWidth: MAP_WIDTH,
+          mapHeight: MAP_HEIGHT
+      });
+
+      // Broadcast to others
+      socket.broadcast.emit('newPlayer', players[socket.id]);
   });
 
-// Server also needs wall data for validation if we wanted it to be authoritative.
-// For this simple prototype, we trust the client's optimistic updates slightly,
-// but we still apply them here. Ideally, full collision logic goes here too.
-const walls = [
-    { x: 500, y: 500, w: 200, h: 50 },
-    { x: 500, y: 500, w: 50, h: 300 },
-    { x: 1200, y: 800, w: 400, h: 400 },
-    { x: 800, y: 1500, w: 500, h: 50 },
-    { x: 200, y: 200, w: 100, h: 100 },
-];
+  socket.on('disconnect', () => {
+    console.log('user disconnected', socket.id);
+    if (players[socket.id]) {
+        delete players[socket.id];
+        io.emit('playerDisconnected', socket.id);
+    }
+  });
 
-  socket.on('move', (data) => {
+  socket.on('playerMovement', (movementData) => {
     if (players[socket.id] && players[socket.id].isAlive) {
-        let p = players[socket.id];
-        let newX = p.x + data.dx;
-        let newY = p.y + data.dy;
-        let canMoveX = true;
-        let canMoveY = true;
+      players[socket.id].x = movementData.x;
+      players[socket.id].y = movementData.y;
+      players[socket.id].facingRight = movementData.facingRight;
 
-        for (let wall of walls) {
-            if (newX + p.radius > wall.x && newX - p.radius < wall.x + wall.w &&
-                p.y + p.radius > wall.y && p.y - p.radius < wall.y + wall.h) {
-                canMoveX = false;
-            }
-            if (p.x + p.radius > wall.x && p.x - p.radius < wall.x + wall.w &&
-                newY + p.radius > wall.y && newY - p.radius < wall.y + wall.h) {
-                canMoveY = false;
-            }
-        }
-
-        if (canMoveX) p.x = newX;
-        if (canMoveY) p.y = newY;
-
-        // Boundary check
-        p.x = Math.max(20, Math.min(1980, p.x));
-        p.y = Math.max(20, Math.min(1980, p.y));
+      // We don't need to send the whole object every tick, just position is fine for optimization,
+      // but sending whole object is easier for this scale.
+      socket.broadcast.emit('playerMoved', players[socket.id]);
     }
   });
 
   socket.on('kill', (targetId) => {
-    if (players[socket.id] && players[socket.id].role === 'judas' && players[socket.id].isAlive) {
-        if (players[targetId] && players[targetId].isAlive) {
+      const killer = players[socket.id];
+      const victim = players[targetId];
 
-            // Server-side distance check
-            const dist = Math.hypot(
-                players[socket.id].x - players[targetId].x,
-                players[socket.id].y - players[targetId].y
-            );
+      if (killer && killer.isImposter && killer.isAlive) {
+          if (victim && victim.isAlive && !victim.isImposter) {
+             // Distance check (120px range)
+             const dist = Math.hypot(killer.x - victim.x, killer.y - victim.y);
+             if (dist < 120) {
+                 victim.isAlive = false;
 
-            if (dist < 150) { // Slightly larger than client to account for lag
-                players[targetId].isAlive = false;
-                io.emit('playerDied', targetId);
-                io.emit('updatePlayers', players);
-                console.log(`${players[socket.id].name} killed ${players[targetId].name}`);
-            }
-        }
-    }
-  });
+                 // Create a dead body object
+                 const body = {
+                     id: `body_${Date.now()}_${targetId}`,
+                     x: victim.x,
+                     y: victim.y,
+                     color: victim.color
+                 };
+                 deadBodies.push(body);
 
-  socket.on('disconnect', () => {
-    console.log('user disconnected: ' + socket.id);
-    delete players[socket.id];
-    if (judasId === socket.id) {
-        judasId = null; // Reset Judas if they leave
-    }
-    io.emit('updatePlayers', players);
+                 // Notify everyone
+                 io.emit('playerKilled', { targetId: targetId, body: body });
+             }
+          }
+      }
   });
 });
 
-// Sync loop
-setInterval(() => {
-    io.emit('updatePlayers', players);
-}, 1000 / 60); // 60 FPS update
-
-http.listen(port, () => {
-  console.log(`Socket.IO server running at http://localhost:${port}/`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`listening on *:${PORT}`);
 });

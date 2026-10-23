@@ -1,270 +1,338 @@
-const socket = io();
-
+const socket = io({ autoConnect: false });
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+const lobbyScreen = document.getElementById('lobbyScreen');
+const gameScreen = document.getElementById('gameScreen');
+const playerNameInput = document.getElementById('playerNameInput');
+const btnJoinGame = document.getElementById('btnJoinGame');
+const roleDisplay = document.getElementById('roleDisplay');
+const statusDisplay = document.getElementById('statusDisplay');
+
 let players = {};
+let deadBodies = [];
 let myId = null;
-let myRole = 'Esperando...';
-let isAlive = true;
 
-// Map dimensions
-const MAP_WIDTH = 2000;
-const MAP_HEIGHT = 2000;
+let MAP_WIDTH = 3000;
+let MAP_HEIGHT = 3000;
 
-// Walls (x, y, w, h)
-const walls = [
-    { x: 500, y: 500, w: 200, h: 50 }, // Temple wall
-    { x: 500, y: 500, w: 50, h: 300 }, // Temple wall
-    { x: 1200, y: 800, w: 400, h: 400 }, // Market area
-    { x: 800, y: 1500, w: 500, h: 50 }, // City wall
-    { x: 200, y: 200, w: 100, h: 100 }, // Well
-];
+// Camera object
+const camera = { x: 0, y: 0 };
 
-// Camera
-let camera = { x: 0, y: 0, width: 0, height: 0 };
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, ' ': false };
 
-// Movement
-const SPEED = 5;
-let moveVector = { x: 0, y: 0 };
-let keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
-
-// Keyboard controls
-window.addEventListener('keydown', (e) => {
-    if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-});
-window.addEventListener('keyup', (e) => {
-    if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+// --- UI Logic ---
+btnJoinGame.addEventListener('click', () => {
+    const name = playerNameInput.value.trim();
+    if (name.length > 0) {
+        socket.connect();
+        socket.emit('joinGame', name);
+        lobbyScreen.classList.remove('active');
+        gameScreen.classList.add('active');
+        resizeCanvas();
+    } else {
+        alert("Please enter a name.");
+    }
 });
 
-// Joystick setup
-const manager = nipplejs.create({
-    zone: document.getElementById('joystick-zone'),
-    mode: 'static',
-    position: { left: '75px', bottom: '75px' },
-    color: 'white'
-});
+// --- Input Logic ---
+document.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+document.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
-manager.on('move', (e, data) => {
-    moveVector.x = Math.cos(data.angle.radian) * data.distance / 50; // Normalize somewhat
-    moveVector.y = -Math.sin(data.angle.radian) * data.distance / 50; // Invert y for canvas
-});
+const btnUp = document.getElementById('btnUp');
+const btnDown = document.getElementById('btnDown');
+const btnLeft = document.getElementById('btnLeft');
+const btnRight = document.getElementById('btnRight');
+const btnKill = document.getElementById('btnKill');
 
-manager.on('end', () => {
-    moveVector.x = 0;
-    moveVector.y = 0;
-});
+function setupTouch(btn, key) {
+    if (!btn) return;
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); keys[key] = true; });
+    btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
+    btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
+}
+setupTouch(btnUp, 'w'); setupTouch(btnDown, 's'); setupTouch(btnLeft, 'a'); setupTouch(btnRight, 'd'); setupTouch(btnKill, ' ');
 
+// --- Resize Logic ---
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    camera.width = canvas.width;
-    camera.height = canvas.height;
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
 
-// Start Game Logic
-document.getElementById('start-button').addEventListener('click', () => {
-    const username = document.getElementById('username-input').value || 'Jugador';
-    socket.emit('joinGame', username);
-    document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('ui-layer').style.display = 'block';
-});
+// --- Socket Logic ---
+socket.on('connect', () => { myId = socket.id; });
 
-// Action Button Logic
-document.getElementById('action-button').addEventListener('click', () => {
-    if (!myId || !players[myId] || !players[myId].isAlive) return;
-
-    if (myRole === 'judas') {
-        // Try to kill nearest disciple
-        let closestId = null;
-        let minDistance = 100; // Kill range
-
-        const me = players[myId];
-
-        for (let id in players) {
-            if (id !== myId && players[id].isAlive && players[id].role !== 'judas') {
-                const target = players[id];
-                const dist = Math.hypot(me.x - target.x, me.y - target.y);
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    closestId = id;
-                }
-            }
-        }
-
-        if (closestId) {
-            socket.emit('kill', closestId);
-        } else {
-            console.log("Nadie cerca para traicionar.");
-        }
-    } else {
-        // Disciple tasks (just a visual alert for now)
-        alert('Orando... Tarea completada.');
-        // In a full game, this would interact with specific task zones
-    }
-});
-
-// Socket Events
-socket.on('init', (data) => {
-    myId = data.id;
+socket.on('initGame', (data) => {
     players = data.players;
+    deadBodies = data.deadBodies;
+    MAP_WIDTH = data.mapWidth;
+    MAP_HEIGHT = data.mapHeight;
+    updateUI();
+    requestAnimationFrame(gameLoop); // Start loop only after init
 });
 
-socket.on('updatePlayers', (serverPlayers) => {
-    players = serverPlayers;
+socket.on('newPlayer', (playerInfo) => { players[playerInfo.id] = playerInfo; });
+socket.on('playerDisconnected', (playerId) => { delete players[playerId]; });
+socket.on('playerMoved', (playerInfo) => {
+    if (players[playerInfo.id]) {
+        players[playerInfo.id].x = playerInfo.x;
+        players[playerInfo.id].y = playerInfo.y;
+        players[playerInfo.id].facingRight = playerInfo.facingRight;
+    }
 });
 
-socket.on('roleAssigned', (role) => {
-    myRole = role;
-    document.getElementById('role-display').innerText = `Role: ${role === 'judas' ? 'Judas (Falso)' : 'Discípulo'}`;
-    if (role === 'judas') {
-        document.getElementById('action-button').innerText = 'Traicionar';
-        document.getElementById('role-display').style.color = 'red';
+socket.on('playerKilled', (data) => {
+    if (players[data.targetId]) {
+        players[data.targetId].isAlive = false;
+    }
+    deadBodies.push(data.body);
+    if (data.targetId === myId) updateUI();
+});
+
+
+function updateUI() {
+    if (!players[myId]) return;
+    const me = players[myId];
+
+    if (me.isImposter) {
+        roleDisplay.innerText = 'Role: Imposter';
+        roleDisplay.className = 'imposter';
     } else {
-        document.getElementById('action-button').innerText = 'Orar (Tarea)';
-        document.getElementById('role-display').style.color = 'blue';
+        roleDisplay.innerText = 'Role: Crewmate';
+        roleDisplay.className = 'crewmate';
     }
-});
 
-socket.on('playerDied', (id) => {
-    if (id === myId) {
-        isAlive = false;
-        alert('Has sido traicionado. Eres un fantasma.');
+    if (!me.isAlive) {
+        statusDisplay.innerText = 'STATUS: GHOST';
+        statusDisplay.className = 'dead';
+    } else {
+        statusDisplay.innerText = 'STATUS: ALIVE';
+        statusDisplay.className = '';
     }
-});
+}
 
+// --- Drawing Logic ---
 
-// Main Game Loop
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
+function drawMap() {
+    // Fill deep space
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+    // Draw Spaceship Floor (centered)
+    ctx.fillStyle = '#4a5568';
+    ctx.fillRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
+
+    // Draw some floor tiles
+    ctx.strokeStyle = '#2d3748';
+    ctx.lineWidth = 2;
+    for (let x = 200; x < MAP_WIDTH - 200; x += 100) {
+        ctx.beginPath(); ctx.moveTo(x, 200); ctx.lineTo(x, MAP_HEIGHT-200); ctx.stroke();
+    }
+    for (let y = 200; y < MAP_HEIGHT - 200; y += 100) {
+        ctx.beginPath(); ctx.moveTo(200, y); ctx.lineTo(MAP_WIDTH-200, y); ctx.stroke();
+    }
+
+    // Draw thick outer walls
+    ctx.strokeStyle = '#a0aec0';
+    ctx.lineWidth = 20;
+    ctx.strokeRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
+}
+
+function drawDeadBody(body) {
+    ctx.save();
+    ctx.translate(body.x, body.y + 15);
+
+    // Bottom half of body
+    ctx.fillStyle = body.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, Math.PI, true); // half circle pointing up
+    ctx.lineTo(-20, 10);
+    ctx.lineTo(20, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+
+    // Bone sticking out
+    ctx.fillStyle = '#ddd';
+    ctx.beginPath();
+    ctx.roundRect(-5, -20, 10, 20, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function drawPlayer(player) {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+
+    if (!player.facingRight) {
+        ctx.scale(-1, 1);
+    }
+
+    // Ghost effect if dead
+    if (!player.isAlive) {
+        ctx.globalAlpha = 0.4;
+        // Make ghosts float up slightly
+        ctx.translate(0, Math.sin(Date.now() / 200) * 5 - 10);
+    }
+
+    const color = player.color;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000';
+
+    // Shadow
+    if(player.isAlive) {
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(0, 30, 20, 8, 0, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // Backpack
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(-28, -10, 15, 30, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Body
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, Math.PI, 0); // Head
+    ctx.lineTo(22, 20); // Right side
+    // Right Leg
+    ctx.arc(12, 20, 10, 0, Math.PI);
+    // Crotch
+    ctx.lineTo(-2, 20);
+    // Left Leg
+    ctx.arc(-12, 20, 10, 0, Math.PI);
+    ctx.lineTo(-22, 0); // Left side
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Visor
+    ctx.fillStyle = '#9bc4e2';
+    ctx.beginPath();
+    ctx.roundRect(5, -10, 25, 15, 8);
+    ctx.fill();
+    ctx.stroke();
+    // Visor highlight
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(20, -5, 6, 2, Math.PI/8, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Name Tag (unscaled, always reads correctly)
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 16px Arial';
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 4;
+    const yOffset = player.isAlive ? -35 : -50;
+    ctx.strokeText(player.name, 0, yOffset);
+    ctx.fillText(player.name, 0, yOffset);
+    ctx.restore();
 }
 
 function update() {
-    if (!myId || !players[myId] || !players[myId].isAlive) return;
+    if (players[myId]) {
+        const speed = 7;
+        let moved = false;
+        let dx = 0; let dy = 0;
 
-    let dx = 0;
-    let dy = 0;
+        if (keys.w || keys.ArrowUp) dy -= speed;
+        if (keys.s || keys.ArrowDown) dy += speed;
+        if (keys.a || keys.ArrowLeft) { dx -= speed; players[myId].facingRight = false; }
+        if (keys.d || keys.ArrowRight) { dx += speed; players[myId].facingRight = true; }
 
-    // Keyboard
-    if (keys.w || keys.ArrowUp) dy -= 1;
-    if (keys.s || keys.ArrowDown) dy += 1;
-    if (keys.a || keys.ArrowLeft) dx -= 1;
-    if (keys.d || keys.ArrowRight) dx += 1;
+        if (dx !== 0 || dy !== 0) {
+            players[myId].x += dx;
+            players[myId].y += dy;
 
-    // Normalize keyboard vector if moving diagonally
-    if (dx !== 0 && dy !== 0) {
-        const length = Math.sqrt(dx * dx + dy * dy);
-        dx /= length;
-        dy /= length;
-    }
-
-    // Joystick overrides keyboard if active
-    if (moveVector.x !== 0 || moveVector.y !== 0) {
-        dx = moveVector.x;
-        dy = moveVector.y;
-    }
-
-    if (dx !== 0 || dy !== 0) {
-        // Local prediction / collision detection
-        const me = players[myId];
-        let newX = me.x + (dx * SPEED);
-        let newY = me.y + (dy * SPEED);
-        let canMoveX = true;
-        let canMoveY = true;
-
-        for (let wall of walls) {
-            // Check X movement
-            if (newX + me.radius > wall.x && newX - me.radius < wall.x + wall.w &&
-                me.y + me.radius > wall.y && me.y - me.radius < wall.y + wall.h) {
-                canMoveX = false;
+            // Collisions with walls
+            // Allow ghosts to walk through walls, alive players cannot
+            if (players[myId].isAlive) {
+                players[myId].x = Math.max(220, Math.min(MAP_WIDTH - 220, players[myId].x));
+                players[myId].y = Math.max(220, Math.min(MAP_HEIGHT - 230, players[myId].y));
+            } else {
+                players[myId].x = Math.max(20, Math.min(MAP_WIDTH - 20, players[myId].x));
+                players[myId].y = Math.max(20, Math.min(MAP_HEIGHT - 20, players[myId].y));
             }
-            // Check Y movement
-            if (me.x + me.radius > wall.x && me.x - me.radius < wall.x + wall.w &&
-                newY + me.radius > wall.y && newY - me.radius < wall.y + wall.h) {
-                canMoveY = false;
-            }
+
+            moved = true;
         }
 
-        let actualDx = canMoveX ? dx * SPEED : 0;
-        let actualDy = canMoveY ? dy * SPEED : 0;
+        if (moved) {
+            socket.emit('playerMovement', { x: players[myId].x, y: players[myId].y, facingRight: players[myId].facingRight });
+        }
 
-        if (actualDx !== 0 || actualDy !== 0) {
-            socket.emit('move', { dx: actualDx, dy: actualDy });
-            // Optimistic local update to prevent jitter
-            me.x += actualDx;
-            me.y += actualDy;
+        // Camera Follow Logic
+        camera.x = players[myId].x - canvas.width / 2;
+        camera.y = players[myId].y - canvas.height / 2;
+
+        // Clamp camera to map bounds
+        camera.x = Math.max(0, Math.min(MAP_WIDTH - canvas.width, camera.x));
+        camera.y = Math.max(0, Math.min(MAP_HEIGHT - canvas.height, camera.y));
+
+        // Kill logic
+        if (keys[' '] && players[myId].isImposter && players[myId].isAlive) {
+            let closestId = null;
+            let minDistance = 120; // Kill range
+
+            for (const id in players) {
+                if (id !== myId && players[id].isAlive && !players[id].isImposter) {
+                    const dist = Math.hypot(players[myId].x - players[id].x, players[myId].y - players[id].y);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestId = id;
+                    }
+                }
+            }
+
+            if (closestId) {
+                socket.emit('kill', closestId);
+                keys[' '] = false; // Prevent rapid firing
+            }
         }
     }
-
-    // Update camera to follow player
-    const me = players[myId];
-    camera.x = me.x - camera.width / 2;
-    camera.y = me.y - camera.height / 2;
-
-    // Clamp camera to map bounds
-    camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH - camera.width));
-    camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT - camera.height));
 }
 
 function draw() {
-    // Clear background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Save context and apply camera translation
     ctx.save();
+    // Apply camera transformation
     ctx.translate(-camera.x, -camera.y);
 
-    // Draw Map Background (Sand/Desert)
-    ctx.fillStyle = '#e6c280';
-    ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    drawMap();
 
-    // Draw Grid (for testing movement perception)
-    ctx.strokeStyle = '#d4b070';
-    ctx.lineWidth = 2;
-    for(let i=0; i<MAP_WIDTH; i+=100) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, MAP_HEIGHT); ctx.stroke();
+    // Draw dead bodies
+    deadBodies.forEach(body => drawDeadBody(body));
+
+    // Draw players (dead ghosts below alive players)
+    for (const id in players) {
+        if (!players[id].isAlive) drawPlayer(players[id]);
     }
-    for(let i=0; i<MAP_HEIGHT; i+=100) {
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(MAP_WIDTH, i); ctx.stroke();
-    }
-
-    // Draw Walls (Stone structures)
-    ctx.fillStyle = '#8c8c8c';
-    ctx.strokeStyle = '#595959';
-    ctx.lineWidth = 4;
-    for (let wall of walls) {
-        ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
-        ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
-    }
-
-    // Draw Players
-    for (let id in players) {
-        const p = players[id];
-
-        if (!p.isAlive && id !== myId && players[myId].isAlive) {
-            continue; // Living players can't see ghosts
-        }
-
-        ctx.fillStyle = p.isAlive ? p.color : 'rgba(200, 200, 200, 0.5)'; // Ghost color
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Draw Name
-        ctx.fillStyle = 'black';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(p.name, p.x, p.y - p.radius - 10);
+    for (const id in players) {
+        if (players[id].isAlive) drawPlayer(players[id]);
     }
 
     ctx.restore();
 }
 
-requestAnimationFrame(gameLoop);
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}

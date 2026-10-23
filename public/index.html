@@ -1,27 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Among Us - Edición Bíblica</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script> <!-- Joystick library -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Space Imposters</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
-        <div id="ui-layer">
-            <div id="joystick-zone"></div>
-            <button id="action-button">Acción</button>
-            <div id="role-display">Role: Esperando...</div>
-        </div>
-        <div id="start-screen">
-            <h1>Entre Nosotros - Jerusalén</h1>
-            <input type="text" id="username-input" placeholder="Tu Nombre" />
-            <button id="start-button">Unirse</button>
-        </div>
-    </div>
-    <script src="game.js"></script>
+
+  <!-- LOBBY SCREEN -->
+  <div id="lobbyScreen" class="screen active">
+      <div class="lobby-box">
+          <h1>SPACE IMPOSTERS</h1>
+          <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="10">
+          <button id="btnJoinGame">JOIN GAME</button>
+      </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="gameScreen" class="screen">
+      <div id="ui">
+          <h1 id="roleDisplay">Loading Role...</h1>
+          <p id="statusDisplay">Alive</p>
+          <p id="controls" class="desktop-only">WASD/Arrows to Move. Imposters: Space to Kill.</p>
+      </div>
+
+      <canvas id="gameCanvas"></canvas>
+
+      <div id="mobileControls">
+          <div id="dpad">
+              <button id="btnUp" class="dpad-btn">▲</button>
+              <div class="dpad-middle">
+                  <button id="btnLeft" class="dpad-btn">◀</button>
+                  <button id="btnDown" class="dpad-btn">▼</button>
+                  <button id="btnRight" class="dpad-btn">▶</button>
+              </div>
+          </div>
+          <div class="action-area">
+              <button id="btnKill" class="action-btn">KILL</button>
+          </div>
+      </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/game.js"></script>
 </body>
 </html>
