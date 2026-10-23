@@ -16,6 +16,17 @@ let colorIndex = 0;
 const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
 
+// Task System
+let globalTaskProgress = 0;
+const MAX_TASKS = 50; // Total tasks needed to win
+const tasks = [
+    { x: 1500, y: 500, name: "Fix the Ark" },
+    { x: 500, y: 1500, name: "Part the Red Sea" },
+    { x: 2500, y: 1500, name: "Gather Manna" },
+    { x: 1500, y: 2500, name: "Find the Lost Sheep" },
+    { x: 800, y: 800, name: "Build the Temple" }
+];
+
 io.on('connection', (socket) => {
   console.log('a user connected', socket.id);
 
@@ -44,7 +55,9 @@ io.on('connection', (socket) => {
           players: players,
           deadBodies: deadBodies,
           mapWidth: MAP_WIDTH,
-          mapHeight: MAP_HEIGHT
+          mapHeight: MAP_HEIGHT,
+          tasks: tasks,
+          taskProgress: (globalTaskProgress / MAX_TASKS) * 100
       });
 
       // Broadcast to others
@@ -95,6 +108,15 @@ io.on('connection', (socket) => {
                  io.emit('playerKilled', { targetId: targetId, body: body });
              }
           }
+      }
+  });
+
+  socket.on('taskCompleted', () => {
+      const player = players[socket.id];
+      if (player && player.isAlive && !player.isImposter) {
+          globalTaskProgress++;
+          if (globalTaskProgress > MAX_TASKS) globalTaskProgress = MAX_TASKS;
+          io.emit('updateTaskProgress', (globalTaskProgress / MAX_TASKS) * 100);
       }
   });
 });

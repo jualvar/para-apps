@@ -16,10 +16,15 @@ let myId = null;
 let MAP_WIDTH = 3000;
 let MAP_HEIGHT = 3000;
 
+let tasks = [];
+let completedTasks = new Set();
+let taskProgress = 0;
+let activeTask = null;
+
 // Camera object
 const camera = { x: 0, y: 0 };
 
-const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, ' ': false };
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, ' ': false, 'e': false, 'E': false };
 
 // --- UI Logic ---
 btnJoinGame.addEventListener('click', () => {
@@ -44,6 +49,13 @@ const btnDown = document.getElementById('btnDown');
 const btnLeft = document.getElementById('btnLeft');
 const btnRight = document.getElementById('btnRight');
 const btnKill = document.getElementById('btnKill');
+const btnTask = document.getElementById('btnTask');
+const taskProgressContainer = document.getElementById('taskProgressContainer');
+const taskProgressBar = document.getElementById('taskProgressBar');
+const taskModal = document.getElementById('taskModal');
+const taskQuestion = document.getElementById('taskQuestion');
+const taskAnswers = document.getElementById('taskAnswers');
+const btnCloseTask = document.getElementById('btnCloseTask');
 
 function setupTouch(btn, key) {
     if (!btn) return;
@@ -53,7 +65,12 @@ function setupTouch(btn, key) {
     btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
     btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
 }
-setupTouch(btnUp, 'w'); setupTouch(btnDown, 's'); setupTouch(btnLeft, 'a'); setupTouch(btnRight, 'd'); setupTouch(btnKill, ' ');
+setupTouch(btnUp, 'w'); setupTouch(btnDown, 's'); setupTouch(btnLeft, 'a'); setupTouch(btnRight, 'd'); setupTouch(btnKill, ' '); setupTouch(btnTask, 'e');
+
+btnCloseTask.addEventListener('click', () => {
+    taskModal.style.display = 'none';
+    activeTask = null;
+});
 
 // --- Resize Logic ---
 function resizeCanvas() {
@@ -70,8 +87,15 @@ socket.on('initGame', (data) => {
     deadBodies = data.deadBodies;
     MAP_WIDTH = data.mapWidth;
     MAP_HEIGHT = data.mapHeight;
+    tasks = data.tasks || [];
+    taskProgress = data.taskProgress || 0;
     updateUI();
     requestAnimationFrame(gameLoop); // Start loop only after init
+});
+
+socket.on('updateTaskProgress', (progress) => {
+    taskProgress = progress;
+    updateUI();
 });
 
 socket.on('newPlayer', (playerInfo) => { players[playerInfo.id] = playerInfo; });
@@ -98,11 +122,18 @@ function updateUI() {
     const me = players[myId];
 
     if (me.isImposter) {
-        roleDisplay.innerText = 'Role: Imposter';
+        roleDisplay.innerText = 'Role: Traitor';
         roleDisplay.className = 'imposter';
+        btnKill.style.display = 'block';
+        if(btnTask) btnTask.style.display = 'none';
+        if(taskProgressContainer) taskProgressContainer.style.display = 'none';
     } else {
-        roleDisplay.innerText = 'Role: Crewmate';
+        roleDisplay.innerText = 'Role: Faithful';
         roleDisplay.className = 'crewmate';
+        btnKill.style.display = 'none';
+        if(btnTask) btnTask.style.display = 'block';
+        if(taskProgressContainer) taskProgressContainer.style.display = 'block';
+        if(taskProgressBar) taskProgressBar.style.width = taskProgress + '%';
     }
 
     if (!me.isAlive) {
@@ -139,6 +170,26 @@ function drawMap() {
     ctx.strokeStyle = '#a0aec0';
     ctx.lineWidth = 20;
     ctx.strokeRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
+
+    // Draw Tasks
+    if (players[myId] && !players[myId].isImposter && tasks) {
+        tasks.forEach((task, index) => {
+            if (!completedTasks.has(index)) {
+                ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+                ctx.beginPath();
+                ctx.arc(task.x, task.y, 60, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'yellow';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText(task.name, task.x, task.y + 10);
+            }
+        });
+    }
 }
 
 function drawDeadBody(body) {
@@ -305,8 +356,80 @@ function update() {
                 keys[' '] = false; // Prevent rapid firing
             }
         }
+
+        // Task Logic
+        if ((keys['e'] || keys['E']) && !players[myId].isImposter && players[myId].isAlive && taskModal.style.display === 'none') {
+            keys['e'] = false; keys['E'] = false;
+            let closestTask = null;
+            let closestTaskIndex = -1;
+            let minDistance = 100;
+
+            if (tasks) {
+                tasks.forEach((task, index) => {
+                    if (!completedTasks.has(index)) {
+                        const dist = Math.hypot(players[myId].x - task.x, players[myId].y - task.y);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            closestTask = task;
+                            closestTaskIndex = index;
+                        }
+                    }
+                });
+            }
+
+            if (closestTask) {
+                openTaskModal(closestTask, closestTaskIndex);
+            }
+        }
     }
 }
+
+const biblicalQuestions = [
+    { q: "Who built the Ark?", a: ["Moses", "Noah", "Abraham", "David"], correct: 1 },
+    { q: "Who parted the Red Sea?", a: ["Joshua", "Elijah", "Noah", "Moses"], correct: 3 },
+    { q: "Who defeated Goliath?", a: ["Saul", "Samson", "David", "Solomon"], correct: 2 },
+    { q: "What did God provide for food in the wilderness?", a: ["Bread", "Apples", "Fish", "Manna"], correct: 3 },
+    { q: "Who was swallowed by a great fish?", a: ["Jonah", "Peter", "Paul", "John"], correct: 0 },
+    { q: "Who betrayed Jesus for 30 pieces of silver?", a: ["Peter", "Thomas", "Judas", "John"], correct: 2 },
+    { q: "How many days did God take to create the world?", a: ["7", "6", "3", "40"], correct: 1 },
+    { q: "Who was the first man?", a: ["Moses", "Jesus", "Abraham", "Adam"], correct: 3 },
+    { q: "What is the first book of the Bible?", a: ["Genesis", "Exodus", "Matthew", "Revelation"], correct: 0 },
+    { q: "Who wore a coat of many colors?", a: ["Jacob", "David", "Joseph", "Jesus"], correct: 2 }
+];
+
+function openTaskModal(task, taskIndex) {
+    activeTask = task;
+    activeTask.index = taskIndex;
+    taskModal.style.display = 'flex';
+
+    // Pick a random question
+    const qIndex = Math.floor(Math.random() * biblicalQuestions.length);
+    const qData = biblicalQuestions[qIndex];
+
+    taskQuestion.innerText = qData.q;
+    taskAnswers.innerHTML = '';
+
+    qData.a.forEach((ans, index) => {
+        const btn = document.createElement('button');
+        btn.innerText = ans;
+        btn.onclick = () => {
+            if (index === qData.correct) {
+                // Correct!
+                socket.emit('taskCompleted');
+                completedTasks.add(activeTask.index);
+                taskModal.style.display = 'none';
+                activeTask = null;
+            } else {
+                // Wrong!
+                alert("Incorrect! Try again later.");
+                taskModal.style.display = 'none';
+                activeTask = null;
+            }
+        };
+        taskAnswers.appendChild(btn);
+    });
+}
+
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
