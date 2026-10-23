@@ -27,6 +27,29 @@ document.addEventListener('keyup', (e) => {
     if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
 });
 
+// Mobile Touch Controls
+const btnUp = document.getElementById('btnUp');
+const btnDown = document.getElementById('btnDown');
+const btnLeft = document.getElementById('btnLeft');
+const btnRight = document.getElementById('btnRight');
+const btnKill = document.getElementById('btnKill');
+
+function setupTouch(btn, key) {
+    if (!btn) return;
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+    // Also support mouse clicks on the buttons for testing on desktop
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); keys[key] = true; });
+    btn.addEventListener('mouseup', (e) => { e.preventDefault(); keys[key] = false; });
+    btn.addEventListener('mouseleave', (e) => { e.preventDefault(); keys[key] = false; });
+}
+
+setupTouch(btnUp, 'w');
+setupTouch(btnDown, 's');
+setupTouch(btnLeft, 'a');
+setupTouch(btnRight, 'd');
+setupTouch(btnKill, ' ');
+
 socket.on('connect', () => {
     myId = socket.id;
 });

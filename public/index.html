@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Among Us Clone</title>
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -8,9 +9,25 @@
   <div id="ui">
       <h1 id="roleDisplay">Loading Role...</h1>
       <p id="statusDisplay">Alive</p>
-      <p id="controls">WASD/Arrows to Move. Imposters: Space to Kill near crewmates.</p>
+      <p id="controls" class="desktop-only">WASD/Arrows to Move. Imposters: Space to Kill near crewmates.</p>
   </div>
+
   <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <div id="mobileControls">
+      <div id="dpad">
+          <button id="btnUp" class="dpad-btn">▲</button>
+          <div class="dpad-middle">
+              <button id="btnLeft" class="dpad-btn">◀</button>
+              <button id="btnDown" class="dpad-btn">▼</button>
+              <button id="btnRight" class="dpad-btn">▶</button>
+          </div>
+      </div>
+      <div class="action-area">
+          <button id="btnKill" class="action-btn">KILL</button>
+      </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="/game.js"></script>
 </body>
