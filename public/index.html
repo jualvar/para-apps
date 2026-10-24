@@ -12,9 +12,20 @@
   <!-- LOBBY SCREEN -->
   <div id="lobbyScreen" class="screen active">
       <div class="lobby-box">
-          <h1>BIBLE US FOR JUAN</h1>
-          <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="10">
-          <button id="btnJoinGame">JOIN GAME</button>
+          <h1>EL ARCA DE NOÉ</h1>
+          <input type="text" id="playerNameInput" placeholder="Ingresa tu nombre" maxlength="10">
+          <button id="btnJoinGame">CONECTAR</button>
+      </div>
+  </div>
+
+  <!-- WAITING ROOM SCREEN -->
+  <div id="waitingRoomScreen" class="screen" style="display:none; justify-content: center; align-items: center; background: url('https://www.transparenttextures.com/patterns/stardust.png') #0a0a2a; color: white;">
+      <div class="lobby-box" style="width: 400px; max-width: 90%;">
+          <h2>SALA DE ESPERA</h2>
+          <p>Jugadores conectados: <span id="playerCount">0</span> / 10</p>
+          <div id="playerList" style="text-align: left; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; min-height: 100px; margin-bottom: 20px;"></div>
+          <p id="waitingMessage" style="color: #ffaa00; font-size: 0.9em;">Esperando al anfitrión para iniciar...</p>
+          <button id="btnStartGame" style="display:none; background-color: #28a745;">INICIAR PARTIDA</button>
       </div>
   </div>
 
