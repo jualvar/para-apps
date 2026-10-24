@@ -5,13 +5,17 @@ const ctx = canvas.getContext('2d');
 const lobbyScreen = document.getElementById('lobbyScreen');
 const gameScreen = document.getElementById('gameScreen');
 const playerNameInput = document.getElementById('playerNameInput');
-const btnJoinGame = document.getElementById('btnJoinGame');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
+const btnJoinRoom = document.getElementById('btnJoinRoom');
+const roomCodeInput = document.getElementById('roomCodeInput');
+const roomCodeDisplay = document.getElementById('roomCodeDisplay');
 const roleDisplay = document.getElementById('roleDisplay');
 const statusDisplay = document.getElementById('statusDisplay');
 
 let players = {};
 let deadBodies = [];
 let myId = null;
+let gameState = 'START';
 
 let MAP_WIDTH = 3000;
 let MAP_HEIGHT = 3000;
@@ -46,17 +50,62 @@ function requestFullscreen() {
     }
 }
 
-btnJoinGame.addEventListener('click', () => {
+// Background & Fullscreen Resilience Logic
+const resumeOverlay = document.getElementById('resumeOverlay');
+const btnResume = document.getElementById('btnResume');
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && gameState === 'PLAYING') {
+        // Just note that it went to background, handled mostly by fullscreen lost
+    }
+});
+
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && gameState !== 'LOBBY' && myId) {
+        // Lost fullscreen during active game
+        resumeOverlay.style.display = 'flex';
+    }
+});
+
+btnResume.addEventListener('click', () => {
+    requestFullscreen();
+    setTimeout(() => {
+        resumeOverlay.style.display = 'none';
+        resizeCanvas();
+    }, 500);
+});
+
+btnCreateRoom.addEventListener('click', () => {
     requestFullscreen();
     const name = playerNameInput.value.trim();
     if (name.length > 0) {
         socket.connect();
-        socket.emit('joinGame', name);
-        lobbyScreen.classList.remove('active');
-        document.getElementById('waitingRoomScreen').style.display = 'flex';
+        socket.emit('createRoom', name);
     } else {
-        alert("Por favor ingresa un nombre.");
+        showNotification("Por favor ingresa un nombre.");
     }
+});
+
+btnJoinRoom.addEventListener('click', () => {
+    requestFullscreen();
+    const name = playerNameInput.value.trim();
+    const code = roomCodeInput.value.trim().toUpperCase();
+    if (name.length === 0) {
+        showNotification("Por favor ingresa un nombre.");
+        return;
+    }
+    if (code.length === 0) {
+        showNotification("Por favor ingresa un código de sala.");
+        return;
+    }
+    socket.connect();
+    socket.emit('joinRoom', { name, code });
+});
+
+socket.on('roomJoined', (roomCode) => {
+    lobbyScreen.classList.remove('active');
+    document.getElementById('waitingRoomScreen').style.display = 'flex';
+    roomCodeDisplay.innerText = roomCode;
 });
 
 const btnStartGame = document.getElementById('btnStartGame');
@@ -67,6 +116,14 @@ if (btnStartGame) {
 }
 
 socket.on('lobbyUpdate', (data) => {
+    // Si regresamos desde GAME_OVER, restablecer UI
+    if (gameState === 'GAME_OVER') {
+        gameState = 'LOBBY';
+        document.getElementById('gameOverScreen').style.display = 'none';
+        document.getElementById('gameScreen').classList.remove('active');
+        document.getElementById('waitingRoomScreen').style.display = 'flex';
+    }
+
     players = data.players;
     const count = Object.keys(players).length;
     document.getElementById('playerCount').innerText = count;
@@ -99,7 +156,7 @@ socket.on('lobbyUpdate', (data) => {
 });
 
 socket.on('gameError', (msg) => {
-    alert(msg);
+    showNotification(msg);
 });
 
 
@@ -122,6 +179,21 @@ const taskModal = document.getElementById('taskModal');
 const taskQuestion = document.getElementById('taskQuestion');
 const taskAnswers = document.getElementById('taskAnswers');
 const btnCloseTask = document.getElementById('btnCloseTask');
+const notificationContainer = document.getElementById('notificationContainer');
+
+function showNotification(message) {
+    const notif = document.createElement('div');
+    notif.className = 'game-notification';
+    notif.innerText = message;
+    notificationContainer.appendChild(notif);
+
+    // Auto remove after animation (4 seconds total)
+    setTimeout(() => {
+        if (notif.parentNode === notificationContainer) {
+            notificationContainer.removeChild(notif);
+        }
+    }, 4000);
+}
 
 function setupTouch(btn, key) {
     if (!btn) return;
@@ -251,15 +323,15 @@ socket.on('meetingEnded', (data) => {
     updateUI();
 
     if (data.tie) {
-        alert("¡Empate! Nadie fue expulsado.");
+        showNotification("¡Empate! Nadie fue expulsado.");
     } else if (data.ejectedId) {
         const ejected = players[data.ejectedId];
         if (ejected) {
             const role = ejected.isImposter ? 'Judas' : 'Fiel';
-            alert(ejected.name + " fue expulsado. Era " + role + ".");
+            showNotification(ejected.name + " fue expulsado. Era " + role + ".");
         }
     } else {
-        alert("Se saltó la votación. Nadie fue expulsado.");
+        showNotification("Se saltó la votación. Nadie fue expulsado.");
     }
 });
 
@@ -745,16 +817,16 @@ function update() {
 }
 
 const biblicalQuestions = [
-    { q: "Who built the Ark?", a: ["Moses", "Noah", "Abraham", "David"], correct: 1 },
-    { q: "Who parted the Red Sea?", a: ["Joshua", "Elijah", "Noah", "Moses"], correct: 3 },
-    { q: "Who defeated Goliath?", a: ["Saul", "Samson", "David", "Solomon"], correct: 2 },
-    { q: "What did God provide for food in the wilderness?", a: ["Bread", "Apples", "Fish", "Manna"], correct: 3 },
-    { q: "Who was swallowed by a great fish?", a: ["Jonah", "Peter", "Paul", "John"], correct: 0 },
-    { q: "Who betrayed Jesus for 30 pieces of silver?", a: ["Peter", "Thomas", "Judas", "John"], correct: 2 },
-    { q: "How many days did God take to create the world?", a: ["7", "6", "3", "40"], correct: 1 },
-    { q: "Who was the first man?", a: ["Moses", "Jesus", "Abraham", "Adam"], correct: 3 },
-    { q: "What is the first book of the Bible?", a: ["Genesis", "Exodus", "Matthew", "Revelation"], correct: 0 },
-    { q: "Who wore a coat of many colors?", a: ["Jacob", "David", "Joseph", "Jesus"], correct: 2 }
+    { q: "¿Quién construyó el Arca?", a: ["Moisés", "Noé", "Abraham", "David"], correct: 1 },
+    { q: "¿Quién abrió el Mar Rojo?", a: ["Josué", "Elías", "Noé", "Moisés"], correct: 3 },
+    { q: "¿Quién derrotó a Goliat?", a: ["Saúl", "Sansón", "David", "Salomón"], correct: 2 },
+    { q: "¿Qué proveyó Dios como alimento en el desierto?", a: ["Pan", "Manzanas", "Pescado", "Maná"], correct: 3 },
+    { q: "¿Quién fue tragado por un gran pez?", a: ["Jonás", "Pedro", "Pablo", "Juan"], correct: 0 },
+    { q: "¿Quién traicionó a Jesús por 30 monedas de plata?", a: ["Pedro", "Tomás", "Judas", "Juan"], correct: 2 },
+    { q: "¿Cuántos días tomó Dios para crear el mundo?", a: ["7", "6", "3", "40"], correct: 1 },
+    { q: "¿Quién fue el primer hombre?", a: ["Moisés", "Jesús", "Abraham", "Adán"], correct: 3 },
+    { q: "¿Cuál es el primer libro de la Biblia?", a: ["Génesis", "Éxodo", "Mateo", "Apocalipsis"], correct: 0 },
+    { q: "¿Quién usó una túnica de muchos colores?", a: ["Jacob", "David", "José", "Jesús"], correct: 2 }
 ];
 
 function openTaskModal(task, taskIndex) {
@@ -781,7 +853,7 @@ function openTaskModal(task, taskIndex) {
                 activeTask = null;
             } else {
                 // Wrong!
-                alert("Incorrect! Try again later.");
+                showNotification("¡Incorrecto! Inténtalo de nuevo más tarde.");
                 taskModal.style.display = 'none';
                 activeTask = null;
             }
@@ -876,3 +948,24 @@ function gameLoop() {
     draw();
     requestAnimationFrame(gameLoop);
 }
+
+socket.on('gameOver', (data) => {
+    gameState = 'GAME_OVER';
+    document.getElementById('gameScreen').classList.remove('active');
+
+    const goScreen = document.getElementById('gameOverScreen');
+    const goWinner = document.getElementById('goWinner');
+    const goReason = document.getElementById('goReason');
+    const goTitle = document.getElementById('goTitle');
+
+    goWinner.innerText = `Ganadores: ${data.winner}`;
+    goReason.innerText = data.reason;
+
+    if (data.winner === 'Fieles') {
+        goWinner.style.color = '#4CAF50';
+    } else {
+        goWinner.style.color = '#F44336';
+    }
+
+    goScreen.style.display = 'flex';
+});
