@@ -5,7 +5,10 @@ const ctx = canvas.getContext('2d');
 const lobbyScreen = document.getElementById('lobbyScreen');
 const gameScreen = document.getElementById('gameScreen');
 const playerNameInput = document.getElementById('playerNameInput');
-const btnJoinGame = document.getElementById('btnJoinGame');
+const btnCreateRoom = document.getElementById('btnCreateRoom');
+const btnJoinRoom = document.getElementById('btnJoinRoom');
+const roomCodeInput = document.getElementById('roomCodeInput');
+const roomCodeDisplay = document.getElementById('roomCodeDisplay');
 const roleDisplay = document.getElementById('roleDisplay');
 const statusDisplay = document.getElementById('statusDisplay');
 
@@ -46,17 +49,37 @@ function requestFullscreen() {
     }
 }
 
-btnJoinGame.addEventListener('click', () => {
+btnCreateRoom.addEventListener('click', () => {
     requestFullscreen();
     const name = playerNameInput.value.trim();
     if (name.length > 0) {
         socket.connect();
-        socket.emit('joinGame', name);
-        lobbyScreen.classList.remove('active');
-        document.getElementById('waitingRoomScreen').style.display = 'flex';
+        socket.emit('createRoom', name);
     } else {
         alert("Por favor ingresa un nombre.");
     }
+});
+
+btnJoinRoom.addEventListener('click', () => {
+    requestFullscreen();
+    const name = playerNameInput.value.trim();
+    const code = roomCodeInput.value.trim().toUpperCase();
+    if (name.length === 0) {
+        alert("Por favor ingresa un nombre.");
+        return;
+    }
+    if (code.length === 0) {
+        alert("Por favor ingresa un código de sala.");
+        return;
+    }
+    socket.connect();
+    socket.emit('joinRoom', { name, code });
+});
+
+socket.on('roomJoined', (roomCode) => {
+    lobbyScreen.classList.remove('active');
+    document.getElementById('waitingRoomScreen').style.display = 'flex';
+    roomCodeDisplay.innerText = roomCode;
 });
 
 const btnStartGame = document.getElementById('btnStartGame');
