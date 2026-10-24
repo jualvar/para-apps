@@ -17,18 +17,40 @@ const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
 
 const walls = [
-    { x: 400, y: 400, w: 200, h: 50 },
-    { x: 400, y: 400, w: 50, h: 400 },
-    { x: 800, y: 800, w: 600, h: 50 },
-    { x: 1400, y: 400, w: 50, h: 450 },
-    { x: 2000, y: 200, w: 50, h: 600 },
-    { x: 400, y: 1200, w: 800, h: 50 },
-    { x: 1600, y: 1200, w: 800, h: 50 },
-    { x: 400, y: 1800, w: 50, h: 800 },
-    { x: 1400, y: 1800, w: 50, h: 800 },
-    { x: 2000, y: 1800, w: 50, h: 800 },
-    { x: 800, y: 2200, w: 600, h: 50 },
-    { x: 1350, y: 1350, w: 300, h: 300 }
+    // Borde exterior de la nave (El Arca)
+    { x: 200, y: 200, w: 2600, h: 50 }, // Arriba
+    { x: 200, y: 2750, w: 2600, h: 50 }, // Abajo
+    { x: 200, y: 200, w: 50, h: 2600 }, // Izquierda
+    { x: 2750, y: 200, w: 50, h: 2600 }, // Derecha
+
+    // Zona del Botón de Emergencia (Mesa central)
+    { x: 1350, y: 1350, w: 300, h: 300 }, // Centro (Mesa)
+
+    // Sala Superior Izquierda (Almacén de Comida)
+    { x: 250, y: 800, w: 600, h: 50 }, // Pared inferior almacén
+    { x: 850, y: 250, w: 50, h: 300 }, // Pared derecha almacén (con puerta abajo)
+    { x: 850, y: 650, w: 50, h: 200 }, // Pared derecha almacén continuación
+
+    // Sala Superior Derecha (Navegación / Timón)
+    { x: 2150, y: 800, w: 600, h: 50 }, // Pared inferior navegación
+    { x: 2100, y: 250, w: 50, h: 300 }, // Pared izq navegación
+    { x: 2100, y: 650, w: 50, h: 200 }, // Pared izq navegación continuación
+
+    // Sala Inferior Izquierda (Corral de Animales Grandes)
+    { x: 250, y: 2100, w: 800, h: 50 }, // Pared superior corral
+    { x: 1050, y: 2100, w: 50, h: 300 }, // Pared derecha corral
+    { x: 1050, y: 2500, w: 50, h: 250 }, // Pared derecha corral cont.
+
+    // Sala Inferior Derecha (Corral de Aves / Sala de descanso)
+    { x: 1950, y: 2100, w: 800, h: 50 }, // Pared superior aves
+    { x: 1900, y: 2100, w: 50, h: 300 }, // Pared izq aves
+    { x: 1900, y: 2500, w: 50, h: 250 }, // Pared izq aves cont.
+
+    // Pasillo Central Vertical
+    { x: 1100, y: 800, w: 50, h: 400 },
+    { x: 1850, y: 800, w: 50, h: 400 },
+    { x: 1100, y: 1800, w: 50, h: 300 },
+    { x: 1850, y: 1800, w: 50, h: 300 }
 ];
 
 function checkLineOfSight(x1, y1, x2, y2) {
@@ -57,11 +79,13 @@ let hostId = null;
 let globalTaskProgress = 0;
 let MAX_TASKS = 1; // Default
 const tasks = [
-    { x: 1500, y: 500, name: "Fix the Ark" },
-    { x: 500, y: 1500, name: "Part the Red Sea" },
-    { x: 2500, y: 1500, name: "Gather Manna" },
-    { x: 1500, y: 2500, name: "Find the Lost Sheep" },
-    { x: 800, y: 800, name: "Build the Temple" }
+    { x: 1500, y: 500, name: "Reparar el Timón" }, // Pasillo superior
+    { x: 500, y: 500, name: "Organizar Comida" }, // Almacen
+    { x: 2500, y: 500, name: "Navegar el Arca" }, // Navegacion
+    { x: 500, y: 2400, name: "Alimentar Elefantes" }, // Corral inferior izq
+    { x: 2500, y: 2400, name: "Limpiar Jaulas" }, // Corral inferior der
+    { x: 1500, y: 2500, name: "Contar los Animales" }, // Pasillo inferior
+    { x: 1500, y: 1100, name: "Barrer Pasillo" }
 ];
 
 
@@ -278,7 +302,9 @@ io.on('connection', (socket) => {
   socket.on('callEmergency', () => {
       const player = players[socket.id];
       if (player && player.isAlive && !isMeeting) {
-          startMeeting(socket.id);
+          if (Math.hypot(player.x - 1500, player.y - 1500) < 300) {
+              startMeeting(socket.id);
+          }
       }
   });
 

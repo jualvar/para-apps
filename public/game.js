@@ -345,53 +345,85 @@ function checkCollision(x, y, radius) {
 
 function drawMap() {
 
-    // Fill deep space
-    ctx.fillStyle = '#050510';
+    // Background Water (Ocean)
+    ctx.fillStyle = '#0f5e9c';
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-    // Draw Spaceship Floor (centered)
-    ctx.fillStyle = '#3a4454';
+    // Simple wave effect
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 3;
+    for(let i=0; i<50; i++) {
+        ctx.beginPath();
+        ctx.arc(Math.random()*MAP_WIDTH, Math.random()*MAP_HEIGHT, 50 + Math.random()*50, 0, Math.PI);
+        ctx.stroke();
+    }
+
+    // Draw Ark Floor (Wood)
+    ctx.fillStyle = '#8b5a2b';
     ctx.fillRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
 
-    // Draw stone/tile floor pattern
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+    // Draw wood plank pattern
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 2;
-    const tileSize = 60;
-    for (let x = 200; x < MAP_WIDTH - 200; x += tileSize) {
+    const plankWidth = 80;
+    for (let x = 200; x < MAP_WIDTH - 200; x += plankWidth) {
         ctx.beginPath(); ctx.moveTo(x, 200); ctx.lineTo(x, MAP_HEIGHT-200); ctx.stroke();
     }
-    for (let y = 200; y < MAP_HEIGHT - 200; y += tileSize) {
-        ctx.beginPath(); ctx.moveTo(200, y); ctx.lineTo(MAP_WIDTH-200, y); ctx.stroke();
+    // Nails/texture for wood
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    for(let i=0; i<200; i++) {
+        ctx.beginPath();
+        ctx.arc(200 + Math.random()*(MAP_WIDTH-400), 200 + Math.random()*(MAP_HEIGHT-400), 2, 0, Math.PI*2);
+        ctx.fill();
     }
 
-    // Draw thick outer walls
-    ctx.fillStyle = '#718096';
+    // Draw thick outer walls (Dark Wood)
+    ctx.fillStyle = '#5c3a21';
     ctx.fillRect(200, 150, MAP_WIDTH - 400, 50); // Top
     ctx.fillRect(200, MAP_HEIGHT - 200, MAP_WIDTH - 400, 50); // Bottom
     ctx.fillRect(150, 150, 50, MAP_HEIGHT - 300); // Left
     ctx.fillRect(MAP_WIDTH - 200, 150, 50, MAP_HEIGHT - 300); // Right
 
-    ctx.strokeStyle = '#2d3748';
+    ctx.strokeStyle = '#3e2723';
     ctx.lineWidth = 4;
     ctx.strokeRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
 
-    // Draw internal walls with 3D depth effect
+    // Draw internal walls with 3D depth effect (Wood)
     walls.forEach(w => {
-        // Wall Top (lighter)
-        ctx.fillStyle = '#a0aec0';
+        // Wall Top (lighter wood)
+        ctx.fillStyle = '#8d6e63';
         ctx.fillRect(w.x, w.y - 40, w.w, w.h);
         ctx.strokeRect(w.x, w.y - 40, w.w, w.h);
 
-        // Wall Face (darker)
-        ctx.fillStyle = '#4a5568';
+        // Wall Face (darker wood)
+        ctx.fillStyle = '#5d4037';
         ctx.fillRect(w.x, w.y - 40 + w.h, w.w, 40);
         ctx.strokeRect(w.x, w.y - 40 + w.h, w.w, 40);
     });
 
-    // Emergency Button on table
-    ctx.fillStyle = '#a0aec0';
+    // Draw animal decorations in the corrals
+    ctx.font = '60px Arial';
+    ctx.textAlign = 'center';
+
+    // Corral Inferior Izquierdo (Elefantes, etc)
+    ctx.fillText("🐘", 500, 2300);
+    ctx.fillText("🦒", 650, 2350);
+    ctx.fillText("🦏", 800, 2250);
+
+    // Corral Inferior Derecho (Aves / Ovejas)
+    ctx.fillText("🐑", 2200, 2300);
+    ctx.fillText("🕊️", 2350, 2200);
+    ctx.fillText("🐄", 2500, 2350);
+
+    // Almacen de comida
+    ctx.fillText("🌾", 400, 400);
+    ctx.fillText("🍎", 500, 350);
+    ctx.fillText("🍇", 600, 450);
+
+    // Emergency Button on wooden table
+    ctx.fillStyle = '#6d4c41';
     ctx.beginPath(); ctx.arc(1500, 1490, 80, 0, Math.PI*2); ctx.fill(); ctx.stroke(); // Table top
-    ctx.fillStyle = '#4a5568';
+    ctx.fillStyle = '#4e342e';
     ctx.beginPath(); ctx.ellipse(1500, 1500, 80, 40, 0, 0, Math.PI); ctx.fill(); ctx.stroke(); // Table side
 
     ctx.fillStyle = '#ff0000';
@@ -404,7 +436,7 @@ function drawMap() {
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.font = 'bold 14px Arial';
-    ctx.fillText("EMERGENCY", 1500, 1495);
+    ctx.fillText("EMERGENCIA", 1500, 1495);
 
 
     // Draw Tasks
@@ -629,8 +661,8 @@ function update() {
                 }
             }
 
-            // 2. Check Emergency
-            if (Math.hypot(players[myId].x - 1500, players[myId].y - 1500) < 150) {
+            // 2. Check Emergency (aumentamos radio a 250 por si la mesa colisiona)
+            if (Math.hypot(players[myId].x - 1500, players[myId].y - 1500) < 250) {
                 canEmergency = true;
             }
 
@@ -780,6 +812,63 @@ function draw() {
     }
 
     ctx.restore();
+
+    drawMinimap();
+}
+
+function drawMinimap() {
+    if (!players[myId]) return;
+
+    const minimapSize = 200;
+    const margin = 20;
+    const mapX = canvas.width - minimapSize - margin;
+    const mapY = margin;
+
+    // Minimap background (Water)
+    ctx.fillStyle = 'rgba(15, 94, 156, 0.8)';
+    ctx.fillRect(mapX, mapY, minimapSize, minimapSize);
+
+    // Minimap border
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(mapX, mapY, minimapSize, minimapSize);
+
+    // Scale factor
+    const scaleX = minimapSize / MAP_WIDTH;
+    const scaleY = minimapSize / MAP_HEIGHT;
+
+    // Draw Ark (Wood) on minimap
+    ctx.fillStyle = '#8b5a2b';
+    ctx.fillRect(mapX + (200 * scaleX), mapY + (200 * scaleY), (MAP_WIDTH - 400) * scaleX, (MAP_HEIGHT - 400) * scaleY);
+
+    // Draw walls on minimap
+    ctx.fillStyle = '#5d4037';
+    walls.forEach(w => {
+        ctx.fillRect(mapX + (w.x * scaleX), mapY + (w.y * scaleY), w.w * scaleX, w.h * scaleY);
+    });
+
+    // Draw tasks (if Faithful)
+    if (!players[myId].isImposter) {
+        ctx.fillStyle = 'yellow';
+        tasks.forEach((task, index) => {
+            if (!completedTasks.has(index)) {
+                ctx.beginPath();
+                ctx.arc(mapX + (task.x * scaleX), mapY + (task.y * scaleY), 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+
+    // Draw my player indicator
+    const me = players[myId];
+    ctx.fillStyle = 'white';
+    if(me.isImposter) ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(mapX + (me.x * scaleX), mapY + (me.y * scaleY), 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 }
 
 function gameLoop() {
