@@ -50,9 +50,12 @@ function checkLineOfSight(x1, y1, x2, y2) {
 }
 
 
+let gameState = 'LOBBY';
+let hostId = null;
+
 // Task System
 let globalTaskProgress = 0;
-const MAX_TASKS = 50; // Total tasks needed to win
+let MAX_TASKS = 1; // Default
 const tasks = [
     { x: 1500, y: 500, name: "Fix the Ark" },
     { x: 500, y: 1500, name: "Part the Red Sea" },
@@ -136,44 +139,80 @@ io.on('connection', (socket) => {
   console.log('a user connected', socket.id);
 
   socket.on('joinGame', (playerName) => {
-      // Assign a color
+      if (gameState !== 'LOBBY') {
+          socket.emit('gameError', 'El juego ya ha comenzado.');
+          return;
+      }
+
       const assignedColor = colors[colorIndex % colors.length];
       colorIndex++;
 
-      // Assign role (20% chance imposter)
-      const isImposter = Math.random() < 0.2;
-
-      // Spawn in center area roughly
+      // In lobby, everyone starts as alive, no roles yet
       players[socket.id] = {
         id: socket.id,
-        name: playerName || `Player${Math.floor(Math.random()*1000)}`,
+        name: playerName || `Jugador${Math.floor(Math.random()*1000)}`,
         x: 600 + (Math.random() * 200 - 100),
         y: 600 + (Math.random() * 200 - 100),
         color: assignedColor,
-        isImposter: isImposter,
+        isImposter: false,
         isAlive: true,
         facingRight: true
       };
 
-      // Send initial data to the new player
-      socket.emit('initGame', {
-          players: players,
-          deadBodies: deadBodies,
-          mapWidth: MAP_WIDTH,
-          mapHeight: MAP_HEIGHT,
-          tasks: tasks,
-          taskProgress: (globalTaskProgress / MAX_TASKS) * 100
-      });
+      if (Object.keys(players).length === 1) {
+          hostId = socket.id;
+      }
 
-      // Broadcast to others
-      socket.broadcast.emit('newPlayer', players[socket.id]);
+      io.emit('lobbyUpdate', {
+          players: players,
+          hostId: hostId
+      });
+  });
+
+  socket.on('startGame', () => {
+      if (socket.id === hostId && gameState === 'LOBBY') {
+          const playerKeys = Object.keys(players);
+          if (playerKeys.length < 1) { // change to 3 or 4 for real games
+              return;
+          }
+
+          gameState = 'PLAYING';
+
+          // Assign roles
+          const imposterIndex = Math.floor(Math.random() * playerKeys.length);
+          let faithfulCount = 0;
+          playerKeys.forEach((key, index) => {
+              players[key].isImposter = (index === imposterIndex);
+              if (!players[key].isImposter) faithfulCount++;
+          });
+
+          // Calc total tasks
+          MAX_TASKS = faithfulCount * 3; // 3 tasks per faithful
+          globalTaskProgress = 0;
+          deadBodies = [];
+
+          io.emit('gameStarted', {
+              players: players,
+              tasks: tasks,
+              mapWidth: MAP_WIDTH,
+              mapHeight: MAP_HEIGHT
+          });
+      }
   });
 
   socket.on('disconnect', () => {
     console.log('user disconnected', socket.id);
     if (players[socket.id]) {
         delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
+        if (socket.id === hostId && Object.keys(players).length > 0) {
+            hostId = Object.keys(players)[0]; // Reassign host
+        }
+
+        if (gameState === 'LOBBY') {
+            io.emit('lobbyUpdate', { players: players, hostId: hostId });
+        } else {
+            io.emit('playerDisconnected', socket.id);
+        }
     }
   });
 
@@ -212,6 +251,7 @@ io.on('connection', (socket) => {
 
                  // Notify everyone
                  io.emit('playerKilled', { targetId: targetId, body: body });
+                 checkWinCondition();
              }
           }
       }
@@ -272,11 +312,59 @@ io.on('connection', (socket) => {
       const player = players[socket.id];
       if (player && player.isAlive && !player.isImposter) {
           globalTaskProgress++;
-          if (globalTaskProgress > MAX_TASKS) globalTaskProgress = MAX_TASKS;
-          io.emit('updateTaskProgress', (globalTaskProgress / MAX_TASKS) * 100);
+          if (globalTaskProgress >= MAX_TASKS) {
+              globalTaskProgress = MAX_TASKS;
+              io.emit('updateTaskProgress', 100);
+              checkWinCondition();
+          } else {
+              io.emit('updateTaskProgress', (globalTaskProgress / MAX_TASKS) * 100);
+          }
       }
   });
 });
+
+function checkWinCondition() {
+    if (gameState !== 'PLAYING') return;
+
+    let faithfulAlive = 0;
+    let imposterAlive = 0;
+
+    for (let id in players) {
+        if (players[id].isAlive) {
+            if (players[id].isImposter) {
+                imposterAlive++;
+            } else {
+                faithfulAlive++;
+            }
+        }
+    }
+
+    if (imposterAlive === 0 || globalTaskProgress >= MAX_TASKS) {
+        gameState = 'GAME_OVER';
+        io.emit('gameOver', { winner: 'Fieles', reason: imposterAlive === 0 ? 'Judas fue expulsado' : 'Todas las tareas completadas' });
+        resetGameToLobby();
+    } else if (imposterAlive >= faithfulAlive) {
+        gameState = 'GAME_OVER';
+        io.emit('gameOver', { winner: 'Judas', reason: 'Judas eliminó a la mayoría' });
+        resetGameToLobby();
+    }
+}
+
+function resetGameToLobby() {
+    setTimeout(() => {
+        gameState = 'LOBBY';
+        deadBodies = [];
+        globalTaskProgress = 0;
+
+        // Reset players to lobby state
+        for (let id in players) {
+            players[id].isAlive = true;
+            players[id].isImposter = false;
+        }
+
+        io.emit('lobbyUpdate', { players: players, hostId: hostId });
+    }, 8000); // Wait 8 seconds before returning to lobby
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

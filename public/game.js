@@ -53,13 +53,55 @@ btnJoinGame.addEventListener('click', () => {
         socket.connect();
         socket.emit('joinGame', name);
         lobbyScreen.classList.remove('active');
-        initJoystick();
-        gameScreen.classList.add('active');
-        resizeCanvas();
+        document.getElementById('waitingRoomScreen').style.display = 'flex';
     } else {
-        alert("Please enter a name.");
+        alert("Por favor ingresa un nombre.");
     }
 });
+
+const btnStartGame = document.getElementById('btnStartGame');
+if (btnStartGame) {
+    btnStartGame.addEventListener('click', () => {
+        socket.emit('startGame');
+    });
+}
+
+socket.on('lobbyUpdate', (data) => {
+    players = data.players;
+    const count = Object.keys(players).length;
+    document.getElementById('playerCount').innerText = count;
+
+    let html = '';
+    for(let id in players) {
+        let p = players[id];
+        let hostTag = id === data.hostId ? ' <b>(Anfitrión)</b>' : '';
+        html += `<div><span style="color:${p.color}">●</span> ${p.name}${hostTag}</div>`;
+    }
+    document.getElementById('playerList').innerHTML = html;
+
+    if (myId === data.hostId) {
+        btnStartGame.style.display = 'inline-block';
+        document.getElementById('waitingMessage').style.display = 'none';
+
+        if (count >= 1) { // Change to 3+ for real game
+            btnStartGame.disabled = false;
+            btnStartGame.innerText = 'INICIAR PARTIDA';
+            btnStartGame.style.background = '#28a745';
+        } else {
+            btnStartGame.disabled = true;
+            btnStartGame.innerText = 'ESPERANDO MÁS JUGADORES...';
+            btnStartGame.style.background = 'gray';
+        }
+    } else {
+        btnStartGame.style.display = 'none';
+        document.getElementById('waitingMessage').style.display = 'block';
+    }
+});
+
+socket.on('gameError', (msg) => {
+    alert(msg);
+});
+
 
 // --- Input Logic ---
 document.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
@@ -132,15 +174,23 @@ window.addEventListener('resize', resizeCanvas);
 // --- Socket Logic ---
 socket.on('connect', () => { myId = socket.id; });
 
-socket.on('initGame', (data) => {
+socket.on('gameStarted', (data) => {
+    gameState = 'PLAYING';
+    document.getElementById('waitingRoomScreen').style.display = 'none';
+    gameScreen.classList.add('active');
+
     players = data.players;
-    deadBodies = data.deadBodies;
     MAP_WIDTH = data.mapWidth;
     MAP_HEIGHT = data.mapHeight;
     tasks = data.tasks || [];
-    taskProgress = data.taskProgress || 0;
+    taskProgress = 0;
+    deadBodies = [];
+    completedTasks.clear();
+
+    initJoystick();
+    resizeCanvas();
     updateUI();
-    requestAnimationFrame(gameLoop); // Start loop only after init
+    requestAnimationFrame(gameLoop);
 });
 
 
@@ -150,8 +200,8 @@ socket.on('meetingStarted', (data) => {
     startVoiceChat(); // Start voice chat when meeting starts
     players = data.players; // Updates positions to center
     meetingModal.style.display = 'flex';
-    meetingStatus.innerText = 'Discuss and Vote!';
-    voteTimer.innerText = 'Time left: ' + data.time;
+    meetingStatus.innerText = '¡Discutan y Voten!';
+    voteTimer.innerText = 'Tiempo restante: ' + data.time;
     btnAction.style.display = 'none';
     keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
 
@@ -159,7 +209,7 @@ socket.on('meetingStarted', (data) => {
 
     // Skip button
     const skipBtn = document.createElement('button');
-    skipBtn.innerText = 'Skip Vote';
+    skipBtn.innerText = 'Saltar Voto';
     skipBtn.style.background = '#666';
     skipBtn.onclick = () => castVote('skip');
     votingArea.appendChild(skipBtn);
@@ -201,15 +251,15 @@ socket.on('meetingEnded', (data) => {
     updateUI();
 
     if (data.tie) {
-        alert("Tie! No one was ejected.");
+        alert("¡Empate! Nadie fue expulsado.");
     } else if (data.ejectedId) {
         const ejected = players[data.ejectedId];
         if (ejected) {
-            const role = ejected.isImposter ? 'Judas' : 'Faithful';
-            alert(ejected.name + " was ejected. They were " + role + ".");
+            const role = ejected.isImposter ? 'Judas' : 'Fiel';
+            alert(ejected.name + " fue expulsado. Era " + role + ".");
         }
     } else {
-        alert("Votes skipped. No one was ejected.");
+        alert("Se saltó la votación. Nadie fue expulsado.");
     }
 });
 
@@ -243,21 +293,21 @@ function updateUI() {
     const me = players[myId];
 
     if (me.isImposter) {
-        roleDisplay.innerText = 'Role: Judas (Traitor)';
+        roleDisplay.innerText = 'Rol: Judas (Impostor)';
         roleDisplay.className = 'imposter';
         if(taskProgressContainer) taskProgressContainer.style.display = 'none';
     } else {
-        roleDisplay.innerText = 'Role: Faithful';
+        roleDisplay.innerText = 'Rol: Fiel (Tripulante)';
         roleDisplay.className = 'crewmate';
         if(taskProgressContainer) taskProgressContainer.style.display = 'block';
         if(taskProgressBar) taskProgressBar.style.width = taskProgress + '%';
     }
 
     if (!me.isAlive) {
-        statusDisplay.innerText = 'STATUS: GHOST';
+        statusDisplay.innerText = 'ESTADO: FANTASMA';
         statusDisplay.className = 'dead';
     } else {
-        statusDisplay.innerText = 'STATUS: ALIVE';
+        statusDisplay.innerText = 'ESTADO: VIVO';
         statusDisplay.className = '';
     }
 }
@@ -566,7 +616,7 @@ function update() {
         if (players[myId].isAlive && !isMeeting) {
             btnAction.style.display = 'block';
             btnAction.style.opacity = '0.5';
-            btnAction.innerText = 'USE';
+            btnAction.innerText = 'USAR';
             btnAction.style.borderColor = 'white';
             btnAction.style.boxShadow = 'none';
             btnAction.style.background = 'rgba(255,255,255,0.3)';
@@ -620,25 +670,25 @@ function update() {
             // Prioritize button visual
             if (canReport) {
                 btnAction.style.opacity = '1';
-                btnAction.innerText = 'REPORT';
+                btnAction.innerText = 'REPORTAR';
                 btnAction.style.borderColor = 'orange';
                 btnAction.style.boxShadow = '0 0 15px orange';
                 btnAction.style.background = 'rgba(255,165,0,0.5)';
             } else if (canKill) {
                 btnAction.style.opacity = '1';
-                btnAction.innerText = 'KILL';
+                btnAction.innerText = 'MATAR';
                 btnAction.style.borderColor = 'red';
                 btnAction.style.boxShadow = '0 0 15px red';
                 btnAction.style.background = 'rgba(255,0,0,0.5)';
             } else if (canEmergency) {
                 btnAction.style.opacity = '1';
-                btnAction.innerText = 'MEETING';
+                btnAction.innerText = 'REUNIÓN';
                 btnAction.style.borderColor = 'red';
                 btnAction.style.boxShadow = '0 0 15px red';
                 btnAction.style.background = 'rgba(255,0,0,0.5)';
             } else if (canTask) {
                 btnAction.style.opacity = '1';
-                btnAction.innerText = 'TASK';
+                btnAction.innerText = 'TAREA';
                 btnAction.style.borderColor = 'lime';
                 btnAction.style.boxShadow = '0 0 15px lime';
                 btnAction.style.background = 'rgba(0,255,0,0.5)';
