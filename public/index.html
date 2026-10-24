@@ -63,10 +63,10 @@
       <!-- TASK MODAL -->
       <div id="taskModal" class="modal" style="display:none;">
           <div class="modal-content">
-              <h2>Biblical Task</h2>
-              <p id="taskQuestion">Loading question...</p>
+              <h2>Tarea Bíblica</h2>
+              <p id="taskQuestion">Cargando...</p>
               <div id="taskAnswers" class="task-answers"></div>
-              <button id="btnCloseTask">Close</button>
+              <button id="btnCloseTask">X</button>
           </div>
       </div>
 
@@ -78,6 +78,26 @@
               <button id="btnAction" class="action-btn" style="display:none; opacity: 0.5;">USE</button>
           </div>
       </div>
+      <!-- IN-GAME NOTIFICATIONS -->
+  </div>
+
+  <!-- IN-GAME NOTIFICATIONS (Global) -->
+  <div id="notificationContainer"></div>
+
+  <!-- RESUME OVERLAY (Fullscreen recovery) -->
+  <div id="resumeOverlay">
+      <h2>EL JUEGO ESTÁ EN PAUSA</h2>
+      <p>Toca el botón para regresar al modo inmersivo.</p>
+      <button id="btnResume">REANUDAR</button>
+  </div>
+
+  <!-- PANTALLA FIN DE JUEGO -->
+  <div id="gameOverScreen" style="display: none;">
+      <h1 id="goTitle">¡FIN DEL JUEGO!</h1>
+      <h2 id="goWinner">Ganadores</h2>
+      <p id="goReason">Razón</p>
+      <div class="lds-ellipsis"><div></div><div></div><div></div><div></div></div>
+      <p style="margin-top: 20px;">Regresando a la sala en unos segundos...</p>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
