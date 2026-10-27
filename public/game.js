@@ -17,8 +17,8 @@ let deadBodies = [];
 let myId = null;
 let gameState = 'START';
 
-let MAP_WIDTH = 3000;
-let MAP_HEIGHT = 3000;
+let MAP_WIDTH = 4000;
+let MAP_HEIGHT = 4000;
 
 let tasks = [];
 let completedTasks = new Set();
@@ -43,7 +43,7 @@ function requestFullscreen() {
     } else if (el.msRequestFullscreen) { /* IE/Edge */
         el.msRequestFullscreen();
     }
-
+    
     // Lock orientation if supported
     if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(e => console.log('Orientation lock not supported', e));
@@ -127,7 +127,7 @@ socket.on('lobbyUpdate', (data) => {
     players = data.players;
     const count = Object.keys(players).length;
     document.getElementById('playerCount').innerText = count;
-
+    
     let html = '';
     for(let id in players) {
         let p = players[id];
@@ -135,11 +135,11 @@ socket.on('lobbyUpdate', (data) => {
         html += `<div><span style="color:${p.color}">●</span> ${p.name}${hostTag}</div>`;
     }
     document.getElementById('playerList').innerHTML = html;
-
+    
     if (myId === data.hostId) {
         btnStartGame.style.display = 'inline-block';
         document.getElementById('waitingMessage').style.display = 'none';
-
+        
         if (count >= 1) { // Change to 3+ for real game
             btnStartGame.disabled = false;
             btnStartGame.innerText = 'INICIAR PARTIDA';
@@ -186,7 +186,7 @@ function showNotification(message) {
     notif.className = 'game-notification';
     notif.innerText = message;
     notificationContainer.appendChild(notif);
-
+    
     // Auto remove after animation (4 seconds total)
     setTimeout(() => {
         if (notif.parentNode === notificationContainer) {
@@ -216,14 +216,14 @@ function initJoystick() {
         position: { left: '50%', top: '50%' },
         color: 'white'
     });
-
+    
     joystickManager.on('move', (evt, data) => {
         if (data && data.vector) {
             joystickMove.x = data.vector.x;
             joystickMove.y = -data.vector.y; // nipplejs y is inverted
         }
     });
-
+    
     joystickManager.on('end', () => {
         joystickMove.x = 0;
         joystickMove.y = 0;
@@ -250,7 +250,7 @@ socket.on('gameStarted', (data) => {
     gameState = 'PLAYING';
     document.getElementById('waitingRoomScreen').style.display = 'none';
     gameScreen.classList.add('active');
-
+    
     players = data.players;
     MAP_WIDTH = data.mapWidth;
     MAP_HEIGHT = data.mapHeight;
@@ -258,11 +258,11 @@ socket.on('gameStarted', (data) => {
     taskProgress = 0;
     deadBodies = [];
     completedTasks.clear();
-
+    
     initJoystick();
     resizeCanvas();
     updateUI();
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(gameLoop); 
 });
 
 
@@ -276,16 +276,16 @@ socket.on('meetingStarted', (data) => {
     voteTimer.innerText = 'Tiempo restante: ' + data.time;
     btnAction.style.display = 'none';
     keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
-
+    
     votingArea.innerHTML = '';
-
+    
     // Skip button
     const skipBtn = document.createElement('button');
     skipBtn.innerText = 'Saltar Voto';
     skipBtn.style.background = '#666';
     skipBtn.onclick = () => castVote('skip');
     votingArea.appendChild(skipBtn);
-
+    
     for (let id in players) {
         const p = players[id];
         if (p.isAlive) {
@@ -321,23 +321,12 @@ socket.on('meetingEnded', (data) => {
     players = data.players;
     deadBodies = [];
     updateUI();
-
-    if (data.tie) {
-        showNotification("¡Empate! Nadie fue expulsado.");
-    } else if (data.ejectedId) {
-        const ejected = players[data.ejectedId];
-        if (ejected) {
-            const role = ejected.isImposter ? 'Judas' : 'Fiel';
-            showNotification(ejected.name + " fue expulsado. Era " + role + ".");
-        }
-    } else {
-        showNotification("Se saltó la votación. Nadie fue expulsado.");
+    // Reset joystick state to avoid getting stuck
+    if (players[myId]) {
+        players[myId].isMoving = false;
+        dx = 0;
+        dy = 0;
     }
-});
-
-socket.on('updateTaskProgress', (progress) => {
-    taskProgress = progress;
-    updateUI();
 });
 
 socket.on('newPlayer', (playerInfo) => { players[playerInfo.id] = playerInfo; });
@@ -420,7 +409,7 @@ function drawMap() {
     // Background Water (Ocean)
     ctx.fillStyle = '#0f5e9c';
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-
+    
     // Simple wave effect
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 3;
@@ -455,7 +444,7 @@ function drawMap() {
     ctx.fillRect(200, MAP_HEIGHT - 200, MAP_WIDTH - 400, 50); // Bottom
     ctx.fillRect(150, 150, 50, MAP_HEIGHT - 300); // Left
     ctx.fillRect(MAP_WIDTH - 200, 150, 50, MAP_HEIGHT - 300); // Right
-
+    
     ctx.strokeStyle = '#3e2723';
     ctx.lineWidth = 4;
     ctx.strokeRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
@@ -466,7 +455,7 @@ function drawMap() {
         ctx.fillStyle = '#8d6e63';
         ctx.fillRect(w.x, w.y - 40, w.w, w.h);
         ctx.strokeRect(w.x, w.y - 40, w.w, w.h);
-
+        
         // Wall Face (darker wood)
         ctx.fillStyle = '#5d4037';
         ctx.fillRect(w.x, w.y - 40 + w.h, w.w, 40);
@@ -476,17 +465,17 @@ function drawMap() {
     // Draw animal decorations in the corrals
     ctx.font = '60px Arial';
     ctx.textAlign = 'center';
-
+    
     // Corral Inferior Izquierdo (Elefantes, etc)
     ctx.fillText("🐘", 500, 2300);
     ctx.fillText("🦒", 650, 2350);
     ctx.fillText("🦏", 800, 2250);
-
+    
     // Corral Inferior Derecho (Aves / Ovejas)
     ctx.fillText("🐑", 2200, 2300);
     ctx.fillText("🕊️", 2350, 2200);
     ctx.fillText("🐄", 2500, 2350);
-
+    
     // Almacen de comida
     ctx.fillText("🌾", 400, 400);
     ctx.fillText("🍎", 500, 350);
@@ -652,13 +641,13 @@ function update() {
         if (keys.s || keys.ArrowDown) dy += speed;
         if (keys.a || keys.ArrowLeft) dx -= speed;
         if (keys.d || keys.ArrowRight) dx += speed;
-
+        
         // Add joystick vector
         if (joystickMove.x !== 0 || joystickMove.y !== 0) {
             dx += joystickMove.x * speed;
             dy += joystickMove.y * speed;
         }
-
+        
         if (dx < 0) players[myId].facingRight = false;
         if (dx > 0) players[myId].facingRight = true;
 
@@ -674,7 +663,7 @@ function update() {
                 // Check outer bounds
                 nextX = Math.max(220, Math.min(MAP_WIDTH - 220, nextX));
                 nextY = Math.max(220, Math.min(MAP_HEIGHT - 230, nextY));
-
+                
                 // Check internal walls
                 if (!checkCollision(nextX, players[myId].y, 25)) {
                     players[myId].x = nextX;
@@ -713,7 +702,7 @@ function update() {
         let canReport = false;
         let canEmergency = false;
         let canTask = false;
-
+        
         let killTarget = null;
         let taskTarget = null;
 
@@ -732,7 +721,7 @@ function update() {
                     break;
                 }
             }
-
+            
             // 2. Check Emergency (aumentamos radio a 250 por si la mesa colisiona)
             if (Math.hypot(players[myId].x - 1500, players[myId].y - 1500) < 250) {
                 canEmergency = true;
@@ -770,7 +759,7 @@ function update() {
                     }
                 }
             }
-
+            
             // Prioritize button visual
             if (canReport) {
                 btnAction.style.opacity = '1';
@@ -797,7 +786,7 @@ function update() {
                 btnAction.style.boxShadow = '0 0 15px lime';
                 btnAction.style.background = 'rgba(0,255,0,0.5)';
             }
-
+            
             // Handle Press
             if (keys[' '] || keys['e'] || keys['E'] || keys['r'] || keys['R']) {
                 if (canReport) {
@@ -833,7 +822,7 @@ function openTaskModal(task, taskIndex) {
     activeTask = task;
     activeTask.index = taskIndex;
     taskModal.style.display = 'flex';
-
+    
     // Pick a random question
     const qIndex = Math.floor(Math.random() * biblicalQuestions.length);
     const qData = biblicalQuestions[qIndex];
@@ -884,41 +873,41 @@ function draw() {
     }
 
     ctx.restore();
-
+    
     drawMinimap();
 }
 
 function drawMinimap() {
     if (!players[myId]) return;
-
+    
     const minimapSize = 200;
     const margin = 20;
     const mapX = canvas.width - minimapSize - margin;
     const mapY = margin;
-
+    
     // Minimap background (Water)
     ctx.fillStyle = 'rgba(15, 94, 156, 0.8)';
     ctx.fillRect(mapX, mapY, minimapSize, minimapSize);
-
+    
     // Minimap border
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.strokeRect(mapX, mapY, minimapSize, minimapSize);
-
+    
     // Scale factor
     const scaleX = minimapSize / MAP_WIDTH;
     const scaleY = minimapSize / MAP_HEIGHT;
-
+    
     // Draw Ark (Wood) on minimap
     ctx.fillStyle = '#8b5a2b';
     ctx.fillRect(mapX + (200 * scaleX), mapY + (200 * scaleY), (MAP_WIDTH - 400) * scaleX, (MAP_HEIGHT - 400) * scaleY);
-
+    
     // Draw walls on minimap
     ctx.fillStyle = '#5d4037';
     walls.forEach(w => {
         ctx.fillRect(mapX + (w.x * scaleX), mapY + (w.y * scaleY), w.w * scaleX, w.h * scaleY);
     });
-
+    
     // Draw tasks (if Faithful)
     if (!players[myId].isImposter) {
         ctx.fillStyle = 'yellow';
@@ -930,7 +919,7 @@ function drawMinimap() {
             }
         });
     }
-
+    
     // Draw my player indicator
     const me = players[myId];
     ctx.fillStyle = 'white';
@@ -952,20 +941,20 @@ function gameLoop() {
 socket.on('gameOver', (data) => {
     gameState = 'GAME_OVER';
     document.getElementById('gameScreen').classList.remove('active');
-
+    
     const goScreen = document.getElementById('gameOverScreen');
     const goWinner = document.getElementById('goWinner');
     const goReason = document.getElementById('goReason');
     const goTitle = document.getElementById('goTitle');
-
+    
     goWinner.innerText = `Ganadores: ${data.winner}`;
     goReason.innerText = data.reason;
-
+    
     if (data.winner === 'Fieles') {
         goWinner.style.color = '#4CAF50';
     } else {
         goWinner.style.color = '#F44336';
     }
-
+    
     goScreen.style.display = 'flex';
 });
