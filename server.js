@@ -10,15 +10,15 @@ app.use(express.static('public'));
 const colors = ['#c51111', '#132ed1', '#117f2d', '#ed54ba', '#ef7d0d', '#f5f557', '#3f474e', '#d6e0f0', '#6b2fbb', '#38fedc'];
 
 // Map bounds (much larger now)
-const MAP_WIDTH = 3000;
-const MAP_HEIGHT = 3000;
+const MAP_WIDTH = 4000;
+const MAP_HEIGHT = 4000;
 
 const walls = [
     // Borde exterior de la nave (El Arca)
-    { x: 200, y: 200, w: 2600, h: 50 }, // Arriba
-    { x: 200, y: 2750, w: 2600, h: 50 }, // Abajo
-    { x: 200, y: 200, w: 50, h: 2600 }, // Izquierda
-    { x: 2750, y: 200, w: 50, h: 2600 }, // Derecha
+    { x: 200, y: 200, w: 3600, h: 50 }, // Arriba
+    { x: 200, y: 3750, w: 3600, h: 50 }, // Abajo
+    { x: 200, y: 200, w: 50, h: 3600 }, // Izquierda
+    { x: 3750, y: 200, w: 50, h: 3600 }, // Derecha
 
     // Zona del Botón de Emergencia (Mesa central)
     { x: 1350, y: 1350, w: 300, h: 300 }, // Centro (Mesa)

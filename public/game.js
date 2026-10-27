@@ -17,8 +17,8 @@ let deadBodies = [];
 let myId = null;
 let gameState = 'START';
 
-let MAP_WIDTH = 3000;
-let MAP_HEIGHT = 3000;
+let MAP_WIDTH = 4000;
+let MAP_HEIGHT = 4000;
 
 let tasks = [];
 let completedTasks = new Set();
@@ -321,23 +321,12 @@ socket.on('meetingEnded', (data) => {
     players = data.players;
     deadBodies = [];
     updateUI();
-
-    if (data.tie) {
-        showNotification("¡Empate! Nadie fue expulsado.");
-    } else if (data.ejectedId) {
-        const ejected = players[data.ejectedId];
-        if (ejected) {
-            const role = ejected.isImposter ? 'Judas' : 'Fiel';
-            showNotification(ejected.name + " fue expulsado. Era " + role + ".");
-        }
-    } else {
-        showNotification("Se saltó la votación. Nadie fue expulsado.");
+    // Reset joystick state to avoid getting stuck
+    if (players[myId]) {
+        players[myId].isMoving = false;
+        dx = 0;
+        dy = 0;
     }
-});
-
-socket.on('updateTaskProgress', (progress) => {
-    taskProgress = progress;
-    updateUI();
 });
 
 socket.on('newPlayer', (playerInfo) => { players[playerInfo.id] = playerInfo; });
