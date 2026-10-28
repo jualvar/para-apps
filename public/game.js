@@ -404,38 +404,55 @@ function checkCollision(x, y, radius) {
 
 // --- Drawing Logic ---
 
+
+// --- Load Map Background Image ---
+const mapBgImage = new Image();
+mapBgImage.src = '/map.jpg';
+let mapBgLoaded = false;
+mapBgImage.onload = () => { mapBgLoaded = true; };
+
+
+// --- Load Map Background Image ---
+const mapBgImage = new Image();
+mapBgImage.src = '/map.jpg';
+let mapBgLoaded = false;
+mapBgImage.onload = () => { mapBgLoaded = true; };
+
+
+// --- Load Map Background Image ---
+const mapBgImage = new Image();
+mapBgImage.src = '/map.jpg';
+let mapBgLoaded = false;
+mapBgImage.onload = () => { mapBgLoaded = true; };
+
 function drawMap() {
 
     // Background Water (Ocean)
     ctx.fillStyle = '#0f5e9c';
     ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-    
-    // Simple wave effect
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.lineWidth = 3;
-    for(let i=0; i<50; i++) {
-        ctx.beginPath();
-        ctx.arc(Math.random()*MAP_WIDTH, Math.random()*MAP_HEIGHT, 50 + Math.random()*50, 0, Math.PI);
-        ctx.stroke();
-    }
 
-    // Draw Ark Floor (Wood)
-    ctx.fillStyle = '#8b5a2b';
-    ctx.fillRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
+    // Draw the image instead of the procedural Ark floor if loaded
+    if (mapBgLoaded) {
+        ctx.drawImage(mapBgImage, 200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
+    } else {
+        // Draw Ark Floor (Wood) fallback
+        ctx.fillStyle = '#8b5a2b';
+        ctx.fillRect(200, 200, MAP_WIDTH - 400, MAP_HEIGHT - 400);
 
-    // Draw wood plank pattern
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.lineWidth = 2;
-    const plankWidth = 80;
-    for (let x = 200; x < MAP_WIDTH - 200; x += plankWidth) {
-        ctx.beginPath(); ctx.moveTo(x, 200); ctx.lineTo(x, MAP_HEIGHT-200); ctx.stroke();
-    }
-    // Nails/texture for wood
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    for(let i=0; i<200; i++) {
-        ctx.beginPath();
-        ctx.arc(200 + Math.random()*(MAP_WIDTH-400), 200 + Math.random()*(MAP_HEIGHT-400), 2, 0, Math.PI*2);
-        ctx.fill();
+        // Draw wood plank pattern
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.lineWidth = 2;
+        const plankWidth = 80;
+        for (let x = 200; x < MAP_WIDTH - 200; x += plankWidth) {
+            ctx.beginPath(); ctx.moveTo(x, 200); ctx.lineTo(x, MAP_HEIGHT-200); ctx.stroke();
+        }
+        // Nails/texture for wood
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        for(let i=0; i<200; i++) {
+            ctx.beginPath();
+            ctx.arc(200 + Math.random()*(MAP_WIDTH-400), 200 + Math.random()*(MAP_HEIGHT-400), 2, 0, Math.PI*2);
+            ctx.fill();
+        }
     }
 
     // Draw thick outer walls (Dark Wood)
