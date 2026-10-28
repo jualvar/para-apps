@@ -6,7 +6,7 @@ async function startVoiceChat() {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         document.getElementById('voiceChatStatus').innerText = 'Voice Chat: Active (Mic On)';
         document.getElementById('voiceChatStatus').style.color = '#00ff00';
-
+        
         socket.emit('joinVoice');
     } catch (e) {
         console.error('Microphone access denied or error:', e);
@@ -62,7 +62,7 @@ function createPeerConnection(peerId, isInitiator) {
             socket.emit('voiceSignal', { to: peerId, offer: offer });
         });
     }
-
+    
     return pc;
 }
 
@@ -75,7 +75,7 @@ socket.on('userJoinedVoice', (peerId) => {
 
 socket.on('voiceSignal', async (data) => {
     const peerId = data.from;
-
+    
     let pc = peerConnections[peerId];
     if (!pc) {
         pc = createPeerConnection(peerId, false);

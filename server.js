@@ -44,7 +44,7 @@ const walls = [
     { x: 1900, y: 2500, w: 50, h: 250 }, // Pared izq aves cont.
 
     // Pasillo Central Vertical
-    { x: 1100, y: 800, w: 50, h: 400 },
+    { x: 1100, y: 800, w: 50, h: 400 }, 
     { x: 1850, y: 800, w: 50, h: 400 },
     { x: 1100, y: 1800, w: 50, h: 300 },
     { x: 1850, y: 1800, w: 50, h: 300 }
@@ -56,7 +56,7 @@ function checkLineOfSight(x1, y1, x2, y2) {
         const maxX = Math.max(x1, x2);
         const minY = Math.min(y1, y2);
         const maxY = Math.max(y1, y2);
-
+        
         if (maxX >= w.x && minX <= w.x + w.w && maxY >= w.y && minY <= w.y + w.h) {
             return false;
         }
@@ -65,12 +65,12 @@ function checkLineOfSight(x1, y1, x2, y2) {
 }
 
 const ROOM_TASKS = [
-    { x: 1500, y: 500, name: "Reparar el Timón" },
-    { x: 500, y: 500, name: "Organizar Comida" },
-    { x: 2500, y: 500, name: "Navegar el Arca" },
-    { x: 500, y: 2400, name: "Alimentar Elefantes" },
-    { x: 2500, y: 2400, name: "Limpiar Jaulas" },
-    { x: 1500, y: 2500, name: "Contar los Animales" },
+    { x: 1500, y: 500, name: "Reparar el Timón" }, 
+    { x: 500, y: 500, name: "Organizar Comida" }, 
+    { x: 2500, y: 500, name: "Navegar el Arca" }, 
+    { x: 500, y: 2400, name: "Alimentar Elefantes" }, 
+    { x: 2500, y: 2400, name: "Limpiar Jaulas" }, 
+    { x: 1500, y: 2500, name: "Contar los Animales" }, 
     { x: 1500, y: 1100, name: "Barrer Pasillo" }
 ];
 
@@ -106,11 +106,11 @@ function generateRoomCode() {
 function startMeeting(roomCode, callerId) {
     const room = rooms[roomCode];
     if (!room || room.isMeeting) return;
-
+    
     room.isMeeting = true;
     room.votes = {};
     room.meetingTimeLeft = 30;
-
+    
     // Move everyone to center
     for (let id in room.players) {
         if (room.players[id].isAlive) {
@@ -118,9 +118,9 @@ function startMeeting(roomCode, callerId) {
             room.players[id].y = 1500 + Math.sin(Math.random()*Math.PI*2) * 250;
         }
     }
-
+    
     io.to(roomCode).emit('meetingStarted', { callerId, time: room.meetingTimeLeft, players: room.players });
-
+    
     room.meetingInterval = setInterval(() => {
         room.meetingTimeLeft--;
         io.to(roomCode).emit('meetingTimer', room.meetingTimeLeft);
@@ -133,15 +133,15 @@ function startMeeting(roomCode, callerId) {
 function endMeeting(roomCode) {
     const room = rooms[roomCode];
     if (!room || !room.isMeeting) return;
-
+    
     room.isMeeting = false;
     clearInterval(room.meetingInterval);
-
+    
     const voteCounts = {};
     let maxVotes = 0;
     let ejectedId = null;
     let tie = false;
-
+    
     for (let id in room.votes) {
         const votedFor = room.votes[id];
         if (votedFor !== 'skip') {
@@ -155,7 +155,7 @@ function endMeeting(roomCode) {
             }
         }
     }
-
+    
     if (ejectedId && !tie) {
         if (room.players[ejectedId]) {
             room.players[ejectedId].isAlive = false;
@@ -163,11 +163,11 @@ function endMeeting(roomCode) {
     } else {
         ejectedId = null;
     }
-
+    
     room.deadBodies = [];
-
+    
     io.to(roomCode).emit('meetingEnded', { ejectedId, players: room.players, tie });
-
+    
     setTimeout(() => {
         checkWinCondition(roomCode);
     }, 1000);
@@ -204,17 +204,17 @@ function checkWinCondition(roomCode) {
 function resetGameToLobby(roomCode) {
     const room = rooms[roomCode];
     if (!room) return;
-
+    
     setTimeout(() => {
         room.gameState = 'LOBBY';
         room.deadBodies = [];
         room.globalTaskProgress = 0;
-
+        
         for (let id in room.players) {
             room.players[id].isAlive = true;
             room.players[id].isImposter = false;
         }
-
+        
         io.to(roomCode).emit('lobbyUpdate', { players: room.players, hostId: room.hostId });
     }, 8000);
 }
@@ -227,13 +227,13 @@ io.on('connection', (socket) => {
         const roomCode = generateRoomCode();
         rooms[roomCode] = createRoomData();
         const room = rooms[roomCode];
-
+        
         currentRoom = roomCode;
         socket.join(roomCode);
-
+        
         const assignedColor = colors[room.colorIndex % colors.length];
         room.colorIndex++;
-
+        
         room.players[socket.id] = {
             id: socket.id,
             name: playerName || `Jugador${Math.floor(Math.random()*1000)}`,
@@ -244,7 +244,7 @@ io.on('connection', (socket) => {
             isAlive: true,
             facingRight: true
         };
-
+        
         room.hostId = socket.id;
         socket.emit('roomJoined', roomCode);
         io.to(roomCode).emit('lobbyUpdate', { players: room.players, hostId: room.hostId });
@@ -254,7 +254,7 @@ io.on('connection', (socket) => {
         const roomCode = data.code;
         const playerName = data.name;
         const room = rooms[roomCode];
-
+        
         if (!room) {
             socket.emit('gameError', 'Sala no encontrada.');
             return;
@@ -263,13 +263,13 @@ io.on('connection', (socket) => {
             socket.emit('gameError', 'El juego ya ha comenzado en esta sala.');
             return;
         }
-
+        
         currentRoom = roomCode;
         socket.join(roomCode);
-
+        
         const assignedColor = colors[room.colorIndex % colors.length];
         room.colorIndex++;
-
+        
         room.players[socket.id] = {
             id: socket.id,
             name: playerName || `Jugador${Math.floor(Math.random()*1000)}`,
@@ -280,11 +280,11 @@ io.on('connection', (socket) => {
             isAlive: true,
             facingRight: true
         };
-
+        
         if (Object.keys(room.players).length === 1) {
             room.hostId = socket.id;
         }
-
+        
         socket.emit('roomJoined', roomCode);
         io.to(roomCode).emit('lobbyUpdate', { players: room.players, hostId: room.hostId });
     });
@@ -292,7 +292,7 @@ io.on('connection', (socket) => {
     socket.on('startGame', () => {
         if (!currentRoom) return;
         const room = rooms[currentRoom];
-
+        
         if (socket.id === room.hostId && room.gameState === 'LOBBY') {
             const playerKeys = Object.keys(room.players);
             if (playerKeys.length < 1) { // change to higher later
@@ -327,7 +327,7 @@ io.on('connection', (socket) => {
             const room = rooms[currentRoom];
             if (room.players[socket.id]) {
                 delete room.players[socket.id];
-
+                
                 const remainingKeys = Object.keys(room.players);
                 if (remainingKeys.length === 0) {
                     delete rooms[currentRoom]; // Clean up empty room
@@ -349,13 +349,13 @@ io.on('connection', (socket) => {
     socket.on('playerMovement', (movementData) => {
         if (!currentRoom || !rooms[currentRoom]) return;
         const room = rooms[currentRoom];
-
+        
         if (room.players[socket.id] && room.players[socket.id].isAlive) {
             room.players[socket.id].x = movementData.x;
             room.players[socket.id].y = movementData.y;
             room.players[socket.id].facingRight = movementData.facingRight;
             room.players[socket.id].isMoving = movementData.isMoving;
-
+            
             socket.broadcast.to(currentRoom).emit('playerMoved', room.players[socket.id]);
         }
     });
@@ -363,7 +363,7 @@ io.on('connection', (socket) => {
     socket.on('kill', (targetId) => {
         if (!currentRoom || !rooms[currentRoom]) return;
         const room = rooms[currentRoom];
-
+        
         const killer = room.players[socket.id];
         const victim = room.players[targetId];
 
@@ -391,7 +391,7 @@ io.on('connection', (socket) => {
     socket.on('reportBody', () => {
         if (!currentRoom || !rooms[currentRoom]) return;
         const room = rooms[currentRoom];
-
+        
         const player = room.players[socket.id];
         if (player && player.isAlive && !room.isMeeting) {
             let nearBody = false;
@@ -406,11 +406,11 @@ io.on('connection', (socket) => {
             }
         }
     });
-
+    
     socket.on('callEmergency', () => {
         if (!currentRoom || !rooms[currentRoom]) return;
         const room = rooms[currentRoom];
-
+        
         const player = room.players[socket.id];
         if (player && player.isAlive && !room.isMeeting) {
             if (Math.hypot(player.x - 1500, player.y - 1500) < 300) {
@@ -418,12 +418,12 @@ io.on('connection', (socket) => {
             }
         }
     });
-
+    
     // Voice Chat Signaling
     socket.on('joinVoice', () => {
         if(currentRoom) socket.broadcast.to(currentRoom).emit('userJoinedVoice', socket.id);
     });
-
+    
     socket.on('voiceSignal', (data) => {
         if(currentRoom) io.to(data.to).emit('voiceSignal', { from: socket.id, ...data });
     });
@@ -431,11 +431,11 @@ io.on('connection', (socket) => {
     socket.on('castVote', (targetId) => {
         if (!currentRoom || !rooms[currentRoom]) return;
         const room = rooms[currentRoom];
-
+        
         if (room.isMeeting && room.players[socket.id] && room.players[socket.id].isAlive && !room.votes[socket.id]) {
             room.votes[socket.id] = targetId;
             io.to(currentRoom).emit('voteUpdate', room.votes);
-
+            
             let allVoted = true;
             for (let id in room.players) {
                 if (room.players[id].isAlive && !room.votes[id]) {
@@ -450,7 +450,7 @@ io.on('connection', (socket) => {
     socket.on('taskCompleted', () => {
         if (!currentRoom || !rooms[currentRoom]) return;
         const room = rooms[currentRoom];
-
+        
         const player = room.players[socket.id];
         if (player && player.isAlive && !player.isImposter) {
             room.globalTaskProgress++;
